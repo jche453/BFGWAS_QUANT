@@ -23,7 +23,7 @@ initype=${12}
 
 echo Run Estep with $line $N $pv
 
-/home/jchen/bfGWAS/bfGWAS_QuantitativeAnnotation/bin/Estep_mcmc -inputSS \
+/home/jchen/bfGWAS/BFGWAS_QUAN_ver2/bin/Estep_mcmc -inputSS \
 -score ${Scoredir}/${line}.score.txt.gz \
 -LDcorr ${LDdir}/${line}.LDcorr.txt.gz \
 -a ${annoDir}/Anno_${line}.gz \

@@ -79,8 +79,8 @@ my $wkDir=getcwd();
 my $makeFile = "bfGWAS.mk";
 my $genofile = "vcf";
 
-my $toolE="/home/jchen/bfGWAS/bfGWAS_QuantitativeAnnotation/bin/Estep_mcmc";
-my $rs="/home/jchen/bfGWAS/bfGWAS_QuantitativeAnnotation/bin/Mstep.r";
+my $toolE="/home/jchen/bfGWAS/BFGWAS_QUAN_ver2/bin/Estep_mcmc";
+my $rs="/home/jchen/bfGWAS/BFGWAS_QUAN_ver2/bin/Mstep.r";
 my $annoDir="/home/jyang/Collaborations/IrwinSAGE/BU_GWASs_CDSymptomDimensions/Anno_Files/PriceAnno/AA";
 my $genoDir = "";
 my $pheno="";
@@ -102,6 +102,7 @@ my $compress=0;
 my $initype="3";
 my $rv="1";
 my $pp="1e-6";
+my $abgamma="0.1";
 
 my $maxmem = "8000";
 my $time = "24:00:00";
@@ -136,7 +137,7 @@ if(!GetOptions ('h'=>\$help, 'v'=>\$verbose, 'd'=>\$debug, 'm'=>\$man,
                 'b:s'=>\$burnin, 'N:s'=>\$Nmcmc, 'NL:s'=>\$NmcmcLast,
                 'c:i'=>\$compress, 'n:i'=>\$N,
                 'initype:s'=>\$initype, 'rv:s'=>\$rv,
-                'pp:s'=>\$pp,
+                'pp:s'=>\$pp,'abgamma:s'=>\$abgamma,
                 'mem:s'=>\$maxmem, 'time:s'=>\$time, 'f:s'=>\$filelist, 'em:i'=>\$EM, 'rs:s'=>\$rs,
                 'l:s'=>\$launchMethod, 'mf:s'=>\$makeFile, 'nice:s'=>\$nice,
                 'j:s' =>\$jobid, 'xnode:s'=>\$xnode, 'wnode:s'=>\$wnode, 'part:s'=>\$part,
@@ -193,11 +194,11 @@ print "genoDir: ", $genoDir,
         "\nfileheads: ", $filelist, "\n",
         "Rscript: ", $rs, "\n",
         "run_Estep.sh and run_Mstep.sh directory: ", $EMdir, "\n",
-        "AnnoNumber: ", $AnnoNumber, "\n";
+        "AnnoNumber: ", $AnnoNumber, "\n",
       #  "GTfield ", $GTfield, "; maf ", $maf, "; smin ", $smin, "\n",
       #  "smax ", $smax, "; win ", $win, "; burnin ", $burnin, "; Nmcmc ", $Nmcmc, "\n",
       #  "NmcmcLast ", $NmcmcLast, "; compress ", $compress, "; initype ", $initype, "\n",
-      #  "rv ", $rv, "; pp ", $pp, "; abgamma ", $abgamma, "\n";
+       "rv ", $rv, "; pp ", $pp, "; abgamma ", $abgamma, "\n";
 printf("\n");
 
 my $comp = "";
@@ -303,7 +304,7 @@ makeJob("local", $tgt, $dep, $wkDir, @cmd);
 
 $tgt = "$wkDir/R$i.OK";
 $dep = "$wkDir/Eoutput/cp_param$i.OK $wkDir/pre_em.OK";
-@cmd = "$EMdir/run_Mstep.sh $pv $i $wkDir $hypcurrent $Annofile";
+@cmd = "$EMdir/run_Mstep.sh $pv $i $wkDir $hypcurrent $Annofile $abgamma";
 # @cmd = "Rscript --vanilla $rs $hypfile $i $pp $abgamma $wkDir/Eoutput/EM_result.txt $hypcurrent >> $wkDir/Rout.txt";
 makeJob($launchMethod, $tgt, $dep, $wkDir, @cmd);
 
@@ -365,7 +366,7 @@ for $i (1..$EM){
 
   $tgt = "$wkDir/R$i.OK";
   $dep = "$wkDir/Eoutput/cp_param$i.OK";
-  @cmd = "$EMdir/run_Mstep.sh $pv $i $wkDir $hypcurrent $Annofile";
+  @cmd = "$EMdir/run_Mstep.sh $pv $i $wkDir $hypcurrent $Annofile $abgamma";
   #@cmd = "Rscript --vanilla $rs $hypfile $i $pp $abgamma $wkDir/Eoutput/EM_result.txt $hypcurrent >> $wkDir/Rout.txt";
   makeJob($launchMethod, $tgt, $dep, $wkDir, @cmd);
 

@@ -6,8 +6,6 @@ ptm <- proc.time()
 
 ######## Need to pass args(hypfile, paramfile, k, hypcurrent_file) from bash
 args <- commandArgs(TRUE)
-#hyptemp#.txt
-#hypfile = args[[1]]
 rv = args[[1]]
 #the number of iterition 
 k = as.numeric(args[[2]])
@@ -16,8 +14,8 @@ hypcurrent_file = args[[3]]
 #Annotation file <- [SNPs,c(SNPname, gamma, beta, annotation1, annotation2, annotation3...)]
 Annofile = args[[4]]
 print(hypcurrent_file)
-
 wkDir = args[[5]]
+abgamma = as.numeric(args[[6]])
 ########## Load beta and gamma 
 Annodata = read.table(Annofile, sep="\t", header=FALSE)
 #Number of annotation files
@@ -28,35 +26,26 @@ for(i in 1:Anum){
 	paste("Annotation", i, sep = "_"))
 }
 colnames(Annodata) <- temp_col_names
-
-############hyptemp.txt
-#hypdata = read.table(hypfile, sep="\t", header=FALSE)
-#temp_col_names_hyp <- c("block", "loglike", "GV", "rv")
-#colnames(hypdata) <-  temp_col_names_hyp
+a_gamma = abgamma
+b_gamma = abgamma
 
 ########### Update hyper parameter values
-#rv is phenotype variance
-#rv = mean(hypdata[, "rv"])
+#rv is phenotype variance, rv = mean(hypdata[, "rv"])
 tau = 1.0 / as.numeric(rv)
-#pve = sum(hypdata[, "GV"])
-
 prehyp <- read.table(hypcurrent_file, header=F)
 print("hyper parameter values before MCMC: ")
 print(prehyp)
-#a_old = prehyp[,1]
-#b_old = prehyp[,2]
-a_old = upper = c(-20, rep(0,Anum))
-b_old = upper = c(1, rep(0,Anum))
+
+a_old = prehyp[,1]
 a_variance = prehyp[,3]
-b_variance = prehyp[,4]
 inverse_a_Var_matrix = diag(1/a_variance)
-inverse_b_Var_matrix = diag(1/b_variance)
 
 #### updating hyper a vector and b vector
-#hypcurrent <- NULL
 hypmat <- NULL
 
-Annodata = Annodata[Annodata$gamma > 0,]
+if (nrow(Annodata[Annodata$gamma > 0,]) > 0){
+  Annodata = Annodata[Annodata$gamma > 0,]
+}
 beta_temp = Annodata[, "beta"]
 gamma_temp = Annodata[,"gamma"]
 A_temp = cbind(rep(1,nrow(Annodata)),Annodata[,-c(1:3)])
@@ -86,34 +75,34 @@ a_Hess <- function(a) {
   return(-(a_Hess_sum))
 }
 
-a_temp = optimx(a_old, a_fn, method='L-BFGS-B', gr = a_gr, hess = a_Hess, upper = c(-14, rep(10,Anum)))[1:nrow(inverse_a_Var_matrix)]
-a_new_Variance = 1/diag(a_Hess(a_old))
+a_new_Variance = diag(solve(a_Hess(a_old)))
+#e = try( optimx(a_old, a_fn, method='L-BFGS-B', gr = a_gr, hess = a_Hess, upper = c(-12, rep(10,Anum)))[1:nrow(inverse_a_Var_matrix)], TRUE)
+#if (class(e) != "try-error"){
+#  a_temp = optimx(a_old, a_fn, method='L-BFGS-B', gr = a_gr, hess = a_Hess, upper = c(-12, rep(10,Anum)))[1:nrow(inverse_a_Var_matrix)]
+#}else{
+  a_old = upper = c(-40, rep(0,Anum))
+  a_temp = optimx(a_old, a_fn, method='L-BFGS-B', gr = a_gr, hess = a_Hess, upper = c(-12, rep(10,Anum)))[1:nrow(inverse_a_Var_matrix)]
+#}
 ####################################################
-b_fn <- function(b){
-  bsum = sum(gamma_temp/2 *(- (A_temp %*% b) - tau * beta_temp ^ 2 * (1/exp(A_temp %*% b)))) - sum(1/2 * t(b) %*% (inverse_b_Var_matrix * b)) 
-  bsum = as.vector(bsum)
-  return(-bsum)
+Est_sigma2 <- function(sigma2, m, tau, a, b){
+  sigma2_hat = (sum(sigma2 * m) * tau + 2 * b) / (sum(m) + 2 * (a + 1))
+  return(sigma2_hat)
 }
 
-b_gr <- function(b){
-  b_gr_sum = apply(gamma_temp/2 *(- A_temp + as.vector(tau * beta_temp ^ 2 * (1/exp(A_temp %*% b))) * A_temp), 2, sum) - apply(inverse_b_Var_matrix * b, 2, sum) 
-  b_gr_sum = as.vector(b_gr_sum)
-  return(-b_gr_sum)
-}
-
-b_Hess <- function(b) {
-  b_Hess_sum = matrix(0,nrow(inverse_b_Var_matrix),ncol(inverse_b_Var_matrix))
-  for (i in 1:nrow(A_temp)) {
-    b_Hess_value = as.numeric(- gamma_temp[i]/2 * tau * beta_temp[i] ^ 2 * exp(-A_temp[i,] %*% b)) * outer(A_temp[i,],A_temp[i,])
-    b_Hess_sum = b_Hess_sum + b_Hess_value
+CI_fish_sigma2 <- function(sigma2, m, tau, a, b){
+  sigma2_hat = Est_sigma2(sigma2, m, tau, a, b)
+  if( (sum(m) * tau - sum(m)/2 - (a+1) + 2*b/sigma2_hat) < 0){
+    se_sigma2=0
+  }else{
+    se_sigma2 = sigma2_hat * sqrt(1/(sum(m) * tau - sum(m)/2 - (a+1) + 2*b/sigma2_hat))
   }
-  b_Hess_sum = b_Hess_sum - inverse_b_Var_matrix
-  b_Hess_sum = as.matrix(b_Hess_sum)
-  return(-b_Hess_sum)
+  return(c(sigma2_hat, se_sigma2))
 }
 
-b_temp = optimx(b_old, b_fn, method='L-BFGS-B', gr = b_gr, hess = b_Hess)[1:nrow(inverse_b_Var_matrix)]
-b_new_Variance = 1/diag(b_Hess(b_old))
+sigma2_temp = CI_fish_sigma2(gamma_temp, beta_temp, tau, a_gamma, b_gamma)
+
+b_temp = rep(sigma2_temp[1], length(a_temp))
+b_new_Variance = rep(sigma2_temp[2], length(a_temp))
 #####################################################
 #hypcurrent <- c(a_temp, b_temp)
 hypmat <- data.frame(as.vector(t(a_temp)), as.vector(t(b_temp)), a_new_Variance, b_new_Variance)

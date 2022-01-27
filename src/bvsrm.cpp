@@ -863,6 +863,7 @@ void BVSRM::setHyp(vector <double> avector_temp, vector <double> bvector_temp)
                 if(anno_idx < (Anum + 1)){
                     avector[anno_idx] = strtod(pch, NULL);
                     //cout << "a:" << avector[anno_idx] << "\t";
+                    //cout << "nch" << nch;
                     if(nch == NULL){
                       cerr << "Need input initial hyper parameter value for b \n";
                       exit(-1);
@@ -891,10 +892,10 @@ void BVSRM::setHyp(vector <double> avector_temp, vector <double> bvector_temp)
         for (size_t j=0; j < Anum; ++j){
           //cout << snp_pos[i].annoscore[j] << "\t";
           theta_value = theta_value + avector[j+1] * snp_pos[i].annoscore[j];
-          sigma2_value = sigma2_value + bvector[j+1] * snp_pos[i].annoscore[j];
+          //sigma2_value = sigma2_value + bvector[j+1] * snp_pos[i].annoscore[j];
         }
-        sigma2_value = 0;
-        sigma2_value = exp(sigma2_value);
+        //sigma2_value = 0;
+        //sigma2_value = exp(sigma2_value);
         theta_value = exp(theta_value) / (1 + exp(theta_value));
         //theta_value = 0.000001;
         theta.push_back(theta_value);
@@ -904,22 +905,22 @@ void BVSRM::setHyp(vector <double> avector_temp, vector <double> bvector_temp)
 
     log_theta.clear();
     log_qtheta.clear();
-    //for (size_t i=0; i < snp_pos.size(); ++i){
-    //    thetasum = thetasum + theta[i];
-    //}
-    //cout << "thetasum: " << thetasum << endl;
-
-    for (size_t i=0; i < snp_pos.size(); ++i){
-      //theta.at(i) = theta[i] / thetasum * snp_pos.size() / 1000000;
-      theta.at(i) = theta[i] / snp_pos.size();
-    }
     for (size_t i=0; i < snp_pos.size(); ++i){
         thetasum = thetasum + theta[i];
     }
     cout << "thetasum: " << thetasum << endl;
 
+    if ((snp_pos.size() / 1000000) < (thetasum)) {
+      for (size_t i=0; i < snp_pos.size(); ++i){
+        theta.at(i) = theta[i] / thetasum * snp_pos.size() / 1000000;
+        //cout << snp_pos[i].rs << " theta:" << theta[i] << " subvar:" << subvar[i] << endl;
+        //theta.at(i) = theta[i] / (snp_pos.size() * thetasum);
+      }
+    }
+
+
     for(size_t i=0; i < snp_pos.size(); ++i){
-        //cout << snp_pos[i].rs << ":" << theta[i] << endl;
+        cout << snp_pos[i].rs << ":" << theta[i] << endl;
         log_theta.push_back(log(theta[i]));
         log_qtheta.push_back(log(1.0 - theta[i]));
     }
@@ -2878,6 +2879,7 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &X
         cerr << "ERROR: phenotype variance is 0!" << endl;
         exit(-1);
     }
+
     // Scale yty with respect to effect sample size
     double yty_max;
     yty_vec.assign(ni_test, yty);
@@ -3527,7 +3529,6 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
         }
     }
     cHyp_new.n_gamma=cHyp_old.n_gamma;
-
     //for (size_t i=0; i<repeat; ++i) {
 
         unif=gsl_rng_uniform(gsl_r);
@@ -3547,7 +3548,8 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
               gsl_vector *beta_cond = gsl_vector_alloc (s_max);
               do {
                   r_add=gsl_ran_discrete (gsl_r, gsl_t);
-              } while ((mapRank2in.count(r_add)!=0) || (CheckR2(rank_old, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond)));
+              //} while ((mapRank2in.count(r_add)!=0));
+              }while ((mapRank2in.count(r_add)!=0) || (CheckR2(rank_old, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond)));
 
               double prob_total=1.0;
 
@@ -3602,10 +3604,10 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
 
         }
         else if (flag_gamma==3) {//switch a snp;
-            //cout << "switch a snp" << endl;
             long int pos_add, pos_remove, pos_rj, pos_aj;
             size_t j_add, j_remove, o;
             double rtr;
+            double n = 0;
 
             gsl_ran_discrete_t *gsl_s, *gsl_a; //JY added dynamic gsl_s
             double *p_cond_remove = new double[ns_neib];
@@ -3624,6 +3626,7 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
             //cout <<"XtX_old: "; PrintMatrix(XtX_old, rank_old.size(), rank_old.size());
             //cout << "temp rank_new:"; PrintVector(rank_new);
             if (s_size > 0) {
+                //cout << "switch a snp 1" << endl;
                 gsl_matrix *XtX_cond=gsl_matrix_alloc (s_size, s_size);
                 gsl_vector *Xty_cond=gsl_vector_alloc (s_size);
                 gsl_vector *beta_cond = gsl_vector_alloc (s_size);
@@ -3635,16 +3638,34 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
                 rtr = CalcResVar(Xty_cond, beta_cond, yty_max); // residual variance
                 gsl_s = MakeProposalSS(LD, Xty, pos_remove, p_cond_remove, mapRank2in, beta_cond, rtr, rank_new);
 
+                //j_add = gsl_ran_discrete(gsl_r, gsl_s);
+                //pos_add = (pos_remove - win) + j_add;
+                //if((pos_add < 0) || (pos_add >= (long int)snp_pos.size()) || (pos_add == pos_remove) || (CheckR2(rank_new, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond))){
+                    //perror("ERROR proposing switch snp\n");
+                //    continue;
+                //}
+                //r_add = mapPos2Rank[pos_add];
 
                 do {
-                j_add = gsl_ran_discrete(gsl_r, gsl_s);
-                pos_add = (pos_remove - win) + j_add;
-                if((pos_add < 0) || (pos_add >= (long int)snp_pos.size()) || (pos_add == pos_remove)){
-                    continue;
-                }
-                r_add = mapPos2Rank[pos_add];
+
+                  j_add = gsl_ran_discrete(gsl_r, gsl_s);
+                  pos_add = (pos_remove - win) + j_add;
+                  //cout << "j_add: " << j_add <<", pos_remove: " << pos_remove << ", win: " << win << ", pos_add: " <<pos_add << endl;
+                  if((pos_add < 0) || (pos_add >= (long int)snp_pos.size()) || (pos_add == pos_remove)){
+                     continue;
+                  }
+                  r_add = mapPos2Rank[pos_add];
+                  n = n + 1;
+                  if(n >= 200){
+                    break;
+                  }
+
                 } while (CheckR2(rank_new, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond));
-                //cout << "successfully propose a switch SNP" << endl;
+                //cout << "halfway switch a snp 1" << endl;
+
+                //r_add = mapPos2Rank[pos_add];
+
+              //}while (CheckR2(rank_new, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond));
 
                 gsl_a = MakeProposalSS(LD, Xty, pos_add, p_cond_add, mapRank2in, beta_cond, rtr, rank_new);
 
@@ -3677,6 +3698,8 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
 
             }
             else {
+                //cout << "switch a snp 2" << endl;
+
                 gsl_s = MakeProposalSS(pos_remove, p_cond_remove, mapRank2in);
 
                 j_add = gsl_ran_discrete(gsl_r, gsl_s);
@@ -3685,7 +3708,6 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
                     perror("ERROR proposing switch snp\n"); //new snp != removed snp
                 r_add = mapPos2Rank[pos_add];
 
-                //construct gsl_s, JY
                 //cout << "o_add = " << pos_add <<  "; r_add = "<<r_add << endl;
                 gsl_a = MakeProposalSS(pos_add, p_cond_add, mapRank2in);
 
