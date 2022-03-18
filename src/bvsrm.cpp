@@ -3646,21 +3646,29 @@ double BVSRM::ProposeGamma_SS (const vector<size_t> &rank_old, vector<size_t> &r
                 //}
                 //r_add = mapPos2Rank[pos_add];
 
-                do {
+                j_add = gsl_ran_discrete(gsl_r, gsl_s);
+                pos_add = (pos_remove - win) + j_add;
+                if((pos_add < 0) || (pos_add >= (long int)ns_test) || (pos_add == pos_remove)){
+                    //cout << "j_add = " << j_add << "; pos_add = " << pos_add << endl;
+                    perror("ERROR proposing switch snp\n"); //new snp != removed snp
+                }
 
-                  j_add = gsl_ran_discrete(gsl_r, gsl_s);
-                  pos_add = (pos_remove - win) + j_add;
+                r_add = mapPos2Rank[pos_add];
+                //do {
+
+                //  j_add = gsl_ran_discrete(gsl_r, gsl_s);
+                //  pos_add = (pos_remove - win) + j_add;
                   //cout << "j_add: " << j_add <<", pos_remove: " << pos_remove << ", win: " << win << ", pos_add: " <<pos_add << endl;
-                  if((pos_add < 0) || (pos_add >= (long int)snp_pos.size()) || (pos_add == pos_remove)){
-                     continue;
-                  }
-                  r_add = mapPos2Rank[pos_add];
-                  n = n + 1;
-                  if(n >= 200){
-                    break;
-                  }
+                //  if((pos_add < 0) || (pos_add >= (long int)snp_pos.size()) || (pos_add == pos_remove)){
+                //     continue;
+                //  }
+                //  r_add = mapPos2Rank[pos_add];
+                //  n = n + 1;
+                //  if(n >= 200){
+                //    break;
+                //  }
 
-                } while (CheckR2(rank_new, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond));
+                //} while (CheckR2(rank_new, r_add, LD, Xty, XtX_cond, Xtx_cond, Xty_cond, beta_cond));
                 //cout << "halfway switch a snp 1" << endl;
 
                 //r_add = mapPos2Rank[pos_add];
