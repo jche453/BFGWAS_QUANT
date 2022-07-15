@@ -58,7 +58,7 @@ int main(int argc, char * argv[])
 	
 	ifstream check_dir("output/");
 	if (!check_dir) {
-		mkdir("output", S_IRWXU|S_IRGRP|S_IROTH);
+		mkdir("output", S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	}	
 	
 	cBFGWAS.Assign(argc, argv, cPar); 

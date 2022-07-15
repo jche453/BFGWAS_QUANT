@@ -35,7 +35,7 @@ void CALCSS::CopyFromParam (PARAM &cPar)
     ns_total=cPar.ns_total;
     ni_test=cPar.ni_test;
     ns_test=cPar.ns_test;
-    //n_type = cPar.n_type;
+    n_type = cPar.n_type;
 
     LDwindow=cPar.LDwindow;
 
@@ -52,99 +52,97 @@ void CALCSS::CopyFromParam (PARAM &cPar)
 
 
 //calculat summary statistics of score statistics and LD matrix
-void CALCSS::GetSS(uchar **X, gsl_vector *y, vector< vector<double> > &LD, vector<double> &beta, vector<double> &beta_SE, vector<double> &U_STAT, vector<double> &SQRT_V_STAT, vector<double> &pval, vector<pair<size_t, double> > &pos_ChisqTest, vector<double> &xtx_vec, vector<double> &snp_var_vec, vector<double> &ni_effect_vec){
-
+// Assume genotype X has SNPs in rows and samples in columns
+void CALCSS::GetSS(gsl_matrix *X, gsl_vector *y, vector< vector<double> > &LD, vector<double> &beta, vector<double> &Z_SCORE, vector<double> &pval, vector<pair<size_t, double> > &pos_ChisqTest)
+{
     cout << "\nStart calculating summary statistics ... \n";
-
-    double yty;
-    // Center y is centered by cPar.CopyPheno()
-    gsl_blas_ddot(y, y, &yty);
-    pheno_var = yty / ((double)(ni_test-1)) ;
+    // X and y are standardized
     cout << "ni_test = " << ni_test << endl;
     cout << "ns_test = " << ns_test << endl;
-    cout << "pheno_var = " << pheno_var << "\n";
+    double yty;
+    gsl_blas_ddot(y, y, &yty);
+    pheno_var = yty / ((double)(ni_test-1)) ;
+    cout << "Standardized pheno_var = " << pheno_var << "\n";
 
-    //cout << "create UcharTable ...\n";
-    CreateUcharTable(UcharTable);
-
-    // define used variables
+    // define used variables 
     gsl_vector *xvec_i = gsl_vector_alloc(ni_test);
     gsl_vector *xvec_j = gsl_vector_alloc(ni_test);
-    gsl_vector *xbeta_i = gsl_vector_alloc(ni_test);
 
-    double xtx_ij, xty, xtx_i, beta_i, v2, chisq_i, beta_SE_i, r2;
-
-    // cout << "calculate xtx by the order of chr/bp ... \n";
-    xtx_vec.clear();
-    snp_var_vec.clear();
-    ni_effect_vec.clear();
-    trace_G = 0;
-    for (size_t i=0; i<ns_test; ++i) {
-        //calculate xtx_i
-        getGTgslVec(X, xvec_i, snp_pos[i].pos, ni_test, ns_test, SNPmean, CompBuffSizeVec, UnCompBufferSize, Compress_Flag, UcharTable);
-        gsl_blas_ddot(xvec_i, xvec_i, &xtx_i);
-        trace_G += xtx_i;
-        xtx_vec.push_back( xtx_i );
-        snp_var_vec.push_back (xtx_i / double(ni_test) );
-        ni_effect_vec.push_back(ni_test);
-    }
+    double xtx_ij, xty,  beta_i, chisq_i, r2, z;
 
     // cout << "calculate beta, score statistics by the order of chr/bp ... \n";
     beta.clear();
     LD.clear();
     pval.clear();
     pos_ChisqTest.clear();
-    beta_SE.clear();
-    for (size_t i=0; i<ns_test; ++i) {
+
+    if(isnan(pheno_var)==1 || pheno_var == 0)
+    {
+        cout << "Phenotype variance = 0. Only save LDcorr file...\n";
+        for (size_t i=0; i<ns_test; ++i) {
         //calculate xtx_i
-        getGTgslVec(X, xvec_i, snp_pos[i].pos, ni_test, ns_test, SNPmean, CompBuffSizeVec, UnCompBufferSize, Compress_Flag, UcharTable);
-        xtx_i = xtx_vec[i];
-
-        //calculate effect-size
-        if(xvec_i->size != y->size){cerr << "Genotype length dose not equal to phenotype length!\n Some samples in the genotype file may not have genotype data!\n Please check your phenotype and genotype input files!\n"; exit(-1);}
-        gsl_blas_ddot(xvec_i, y, &xty);
-        if(xtx_i > 0) beta_i = xty / xtx_i;
-        else beta_i = 0.0;
-        beta.push_back(beta_i); // effect size
-        U_STAT.push_back(xty); // score statistic
-        v2 = pheno_var * xtx_i ;
-        SQRT_V_STAT.push_back( sqrt(v2) ); // score statistic standard deviation
-        // chisq_i = ((double)ni_test)*(log(yty)-log(yty-xty*xty/xtx_i)); // LRT statistic
-        chisq_i = xty * xty / v2; // Score test statistic
-        pval.push_back( gsl_cdf_chisq_Q (chisq_i, 1.0) ); // pvalue needed for BVSRM
-        pos_ChisqTest.push_back( make_pair(i, chisq_i) ) ; // pos_ChisqTest needed for BVSRM
-
-        gsl_vector_memcpy(xbeta_i, xvec_i);
-        gsl_vector_scale(xbeta_i, -beta_i);
-        gsl_vector_add(xbeta_i, y);
-        gsl_blas_ddot(xbeta_i, xbeta_i, &beta_SE_i); // effect-size deviation
-        if(xtx_i > 0) beta_SE_i = sqrt( beta_SE_i / ((double)ni_test * xtx_i) );
-        else beta_SE_i = 0.0;
-        beta_SE.push_back(beta_SE_i);
-
-        // saving X'X to LD
-        LD.push_back(vector<double>()); // save correlation
-        LD[i].push_back(snp_var_vec[i]); // save snp genotype variance
-
-        if(i < (ns_test-1) ){
-            //calculate xtx_ij
-            for(size_t j=(i+1); j < ns_test; ++j){
-                if( (snp_pos[j].chr == snp_pos[i].chr) && (snp_pos[j].bp <= snp_pos[i].bp + LDwindow) )
-                {
-                    getGTgslVec(X, xvec_j, snp_pos[j].pos, ni_test, ns_test, SNPmean, CompBuffSizeVec, UnCompBufferSize, Compress_Flag, UcharTable);
-                    gsl_blas_ddot(xvec_i, xvec_j, &xtx_ij);
-                    r2 = Conv_xtx2_r2(xtx_ij, xtx_vec, i, j);
-                    LD[i].push_back( r2 ); // Correlation between x_i and x_j
+        //Lei's change
+            gsl_matrix_get_row(xvec_i, X, snp_pos[i].pos);
+            // saving X'X to LD
+            LD.push_back(vector<double>()); // save correlation
+            LD[i].push_back(1.0); // save correlation 1.0 for the diagnal values
+            if(i < (ns_test-1) ){
+                //calculate xtx_ij
+                for(size_t j=(i+1); j < ns_test; ++j){
+                    if( (snp_pos[j].chr == snp_pos[i].chr) && (snp_pos[j].bp <= snp_pos[i].bp + LDwindow) )
+                    {
+                        //Lei's change
+                        gsl_matrix_get_row(xvec_j, X, snp_pos[j].pos);
+                        gsl_blas_ddot(xvec_i, xvec_j, &xtx_ij);
+                        r2 = xtx_ij / ((double)ni_test) ;
+                        LD[i].push_back( r2 ); // Correlation between x_i and x_j
+                    }
+                    else{break;}
                 }
-                else{break;}
             }
         }
     }
+    else{
+        for (size_t i=0; i<ns_test; ++i) {
+            //Lei's change
+            gsl_matrix_get_row(xvec_i, X, snp_pos[i].pos);
+            //calculate effect-size
+            if(xvec_i->size != y->size){cerr << "Genotype length dose not equal to phenotype length!\n Some samples in the genotype file may not have genotype data!\n Please check your phenotype and genotype input files!\n"; exit(-1);}
+            gsl_blas_ddot(xvec_i, y, &xty);
+            beta_i = xty / ((double)ni_test);
+            beta.push_back(beta_i); // effect size
 
+            //z-score
+            z = beta_i * sqrt((double)ni_test);
+            Z_SCORE.push_back(z);
+
+            // chisq_i = ((double)ni_test)*(log(yty)-log(yty-xty*xty/xtx_i)); // LRT statistic
+            chisq_i = z * z; // Score test statistic
+            pval.push_back( gsl_cdf_chisq_Q (chisq_i, 1.0) ); // pvalue needed for BVSRM
+            pos_ChisqTest.push_back( make_pair(i, chisq_i) ) ; // pos_ChisqTest needed for BVSRM
+
+            // saving X'X to LD
+            LD.push_back(vector<double>()); // save correlation
+            LD[i].push_back(1.0); // diagnal correlation
+
+            if(i < (ns_test-1) ){
+                //calculate xtx_ij
+                for(size_t j=(i+1); j < ns_test; ++j){
+                    if( (snp_pos[j].chr == snp_pos[i].chr) && (snp_pos[j].bp <= snp_pos[i].bp + LDwindow) )
+                    {
+                        //Lei's change
+                        gsl_matrix_get_row(xvec_j, X, snp_pos[j].pos);
+                        gsl_blas_ddot(xvec_i, xvec_j, &xtx_ij);
+                        r2 = xtx_ij / ((double)ni_test) ;
+                        LD[i].push_back( r2 ); // Correlation between x_i and x_j
+                    }
+                    else{break;}
+                }
+            }
+        }
+    }
     gsl_vector_free(xvec_i);
     gsl_vector_free(xvec_j);
-    gsl_vector_free(xbeta_i);
-
     return;
 }
 
@@ -159,8 +157,8 @@ double Conv_xtx2_r2(const double &xtx_ij, const vector<double> &xtx_vec, const s
     return r2;
 }
 
-
-void CALCSS::WriteSS(const vector< vector<double> > &LD, const vector<double> &beta, const vector<double> &beta_SE, const vector<double> &U_STAT, const vector<double> &SQRT_V_STAT, const vector<double> &pval)
+// JY updated 06/15/2022
+void CALCSS::WriteSS(const vector< vector<double> > &LD, const vector<double> &beta, const vector<double> &Z_SCORE,const vector<double> &pval)
 {
     cout << "\nStart writing summary statistics ... \n";
     String fout = file_out.c_str();
@@ -171,81 +169,113 @@ void CALCSS::WriteSS(const vector< vector<double> > &LD, const vector<double> &b
 
     IFILE cov_out=NULL;
     IFILE score_out=NULL;
-
-    if(zipSS){
-        cov_file_str +=".LDcorr.txt.gz";
-        cov_out = ifopen(cov_file_str, "w", InputFile::BGZF);
-
-        score_file_str += ".score.txt.gz";
-        score_out = ifopen(score_file_str, "w", InputFile::BGZF);
-
-        if(cov_out == NULL || score_out == NULL){
-            perror("Fail to open LD or beta file!!! \n");
+    if( (isnan(pheno_var) != 1) && (pheno_var != 0)) {
+        cout << "\nThe pheno variance != 0, writing z_score and LDcorr files. \n";
+        if(zipSS){
+            cov_file_str +=".LDcorr.txt.gz";
+            cov_out = ifopen(cov_file_str, "w", InputFile::BGZF);
+            score_file_str += ".Zscore.txt.gz";
+            score_out = ifopen(score_file_str, "w", InputFile::BGZF);
+            if(cov_out == NULL || score_out == NULL){
+                perror("Fail to open LD or Zscore file!!! \n");
+            }
         }
-    }else{
-        cov_file_str +=".LDcorr.txt";
-        cov_out = ifopen(cov_file_str, "w", InputFile::UNCOMPRESSED);
+        else{
+            cov_file_str +=".LDcorr.txt";
+            cov_out = ifopen(cov_file_str, "w", InputFile::UNCOMPRESSED);
+            score_file_str += ".Zscore.txt";
+            score_out = ifopen(score_file_str, "w", InputFile::UNCOMPRESSED);
+            if(cov_out == NULL || score_out == NULL){
+                perror("Fail to open LD or Zscore file!!! \n");
+            }
+        }
 
-        score_file_str += ".score.txt";
-        score_out = ifopen(score_file_str, "w", InputFile::UNCOMPRESSED);
+        ifprintf(score_out, "#CHROM\tPOS\tID\tREF\tALT\tN\tMAF\tZ_SCORE\tmBeta\tPVALUE\n");
+        // assuming variants have unique CHR:POS
+        ifprintf(cov_out, "#ORDER\tCHROM\tPOS\tID\tREF\tALT\tN\tMAF\tCORR\n");
+                          //order
+        cout << "\nStart writting LDcorr and Zscore files ... \n";
+        //Write files by the order of chr/bp in snp_pos
+        for(size_t i=0; i<ns_test; i++){
+            ifprintf(score_out, "%s\t%ld\t%s\t%s\t%s\t%u\t%.3e\t%.3e\t%.3e\t%.3e\n", snp_pos[i].chr.c_str(), snp_pos[i].bp, snp_pos[i].rs.c_str(), snp_pos[i].a_major.c_str(), snp_pos[i].a_minor.c_str(), ni_test, snp_pos[i].maf, Z_SCORE[i], beta[i], pval[i]);
+            ifprintf(cov_out, "%u\t%s\t%ld\t%s\t%s\t%s\t%u\t%.3e\t", i,snp_pos[i].chr.c_str(), snp_pos[i].bp, snp_pos[i].rs.c_str(), snp_pos[i].a_major.c_str(), snp_pos[i].a_minor.c_str(), ni_test, snp_pos[i].maf);
+            for(size_t j=0; j<LD[i].size(); j++){
+                ifprintf(cov_out, "%.3e,", LD[i][j]);
+            }
+            ifprintf(cov_out, "\n");
+        }
+        ifclose(cov_out);
+        ifclose(score_out);
 
-        if(cov_out == NULL || score_out == NULL){
-            perror("Fail to open LD or beta file!!! \n");
+        // tabix zipped files
+        // printf("Lei's note: Cannot tabix");
+        String cmd;
+        int sys_status=1;
+        if(zipSS){
+            printf("Tabixing .LDcorr.txt.gz files ... \n");
+            cmd = String("tabix -c \"#\" -s 2 -b 3 -e 3 -f ") + cov_file_str;
+            sys_status = system(cmd.c_str());
+            if ( sys_status == 0 ) {
+                printf( "LD correlation file %s has been tabixed\n", cov_file_str.c_str() );
+            }
+            else {
+                printf("Unable to tabix %s\n", cov_file_str.c_str());
+            }
+            printf("Tabixing .Zscore.txt.gz files ... \n");
+            cmd = String("tabix -c \"#\" -s 1 -b 2 -e 2 -f ") + score_file_str;
+            sys_status = system(cmd.c_str());
+            if ( sys_status == 0 ) {
+                printf( "ZScore statistic file %s has been tabixed\n", score_file_str.c_str() );
+            }
+            else {
+                printf("Unable to tabix %s\n", score_file_str.c_str());
+            }
         }
     }
+    else{
+        cout << "\nPhenotype variance = 0. Only write LDcorr file. \n";
+        if(zipSS){
+            cov_file_str +=".LDcorr.txt.gz";
+            cov_out = ifopen(cov_file_str, "w", InputFile::BGZF);
 
-    // write an extra column saving xtx with centered genotypes
-    ifprintf(score_out, "#CHROM\tPOS\tID\tREF\tALT\tN\tMAF\tHWE_PVALUE\tU_STAT\tSQRT_V_STAT\tEFFSIZE_BETA\tBETA_SE\tPVALUE\n");
-    // assuming variants have unique CHR:POS
-    ifprintf(cov_out, "#CHROM\tPOS\tID\tREF\tALT\tN\tMAF\tCORR\n");
-
-    //Write files by the order of chr/bp
-    for(size_t i=0; i<ns_test; i++){
-
-        // write score statistics
-        ifprintf(score_out, "%s\t%ld\t%s\t%s\t%s\t%u\t%g\t%s\t%g\t%g\t%g\t%g\t%g\n", snp_pos[i].chr.c_str(), snp_pos[i].bp, snp_pos[i].rs.c_str(), snp_pos[i].a_major.c_str(), snp_pos[i].a_minor.c_str(), ni_test, snp_pos[i].maf, "NA", U_STAT[i], SQRT_V_STAT[i], beta[i], beta_SE[i], pval[i]);
-
-        // write banded covariance matrix: chr pos ref alt
-        ifprintf(cov_out, "%s\t%ld\t%s\t%s\t%s\t%u\t%g\t", snp_pos[i].chr.c_str(), snp_pos[i].bp, snp_pos[i].rs.c_str(), snp_pos[i].a_major.c_str(), snp_pos[i].a_minor.c_str(), ni_test, snp_pos[i].maf);
-
-      //  for(size_t j=0; j<LD[i].size(); j++){
-      //      ifprintf(cov_out, "%ld,", snp_pos[i+j].bp);
-      //  }
-      //  ifprintf(cov_out, "\t");
-
-        for(size_t j=0; j<LD[i].size(); j++){
-            ifprintf(cov_out, "%g,", LD[i][j]);
+            if(cov_out == NULL){
+                perror("Fail to open LD file!!! \n");
         }
-        ifprintf(cov_out, "\n");
-
-    }
-
-    ifclose(cov_out);
-    ifclose(score_out);
-
-    // tabix zipped files
-    String cmd;
-    int sys_status=1;
-
-    if(zipSS){
-        printf("Tabixing .LDcorr.txt.gz files ... \n");
-        cmd = String("tabix -c \"#\" -s 1 -b 2 -e 2 -f ") + cov_file_str;
-        sys_status = system(cmd.c_str());
-        if ( sys_status == 0 ) {
-            printf( "LD correlation output %s has been tabixed\n", cov_file_str.c_str() );
         }
-        else {
-            printf("Unable to tabix %s\n", cov_file_str.c_str());
-        }
+        else{
+            cov_file_str +=".LDcorr.txt";
+            cov_out = ifopen(cov_file_str, "w", InputFile::UNCOMPRESSED);
 
-        printf("Tabixing .score.txt.gz files ... \n");
-        cmd = String("tabix -c \"#\" -s 1 -b 2 -e 2 -f ") + score_file_str;
-        sys_status = system(cmd.c_str());
-        if ( sys_status == 0 ) {
-            printf( "Score statistics output %s has been tabixed\n", score_file_str.c_str() );
+            if(cov_out == NULL ){
+                perror("Fail to open LD file!!! \n");
+            }
         }
-        else {
-            printf("Unable to tabix %s\n", score_file_str.c_str());
+        // assuming variants have unique CHR:POS
+        ifprintf(cov_out, "#ORDER\tCHROM\tPOS\tID\tREF\tALT\tN\tMAF\tCORR\n");
+        //Write files by the order of chr/bp in snp_pos
+        for(size_t i=0; i<ns_test; i++){
+            ifprintf(cov_out, "%u\t%s\t%ld\t%s\t%s\t%s\t%u\t%.3e\t", i,snp_pos[i].chr.c_str(), snp_pos[i].bp, snp_pos[i].rs.c_str(), snp_pos[i].a_major.c_str(), snp_pos[i].a_minor.c_str(), ni_test, snp_pos[i].maf);
+            for(size_t j=0; j<LD[i].size(); j++){
+                ifprintf(cov_out, "%.3e,", LD[i][j]);
+            }
+            ifprintf(cov_out, "\n");
+        }
+        ifclose(cov_out);
+
+        // tabix zipped files
+        String cmd;
+        int sys_status=1;
+
+        if(zipSS){
+            printf("Tabixing .LDcorr.txt.gz files ... \n");
+            cmd = String("tabix -c \"#\" -s 2 -b 3 -e 3 -f ") + cov_file_str;
+            sys_status = system(cmd.c_str());
+            if ( sys_status == 0 ) {
+                printf( "LD correlation output %s has been tabixed\n", cov_file_str.c_str() );
+            }
+            else {
+                printf("Unable to tabix %s\n", cov_file_str.c_str());
+            }
         }
     }
 
@@ -280,24 +310,24 @@ void getPval(const vector<double> &beta, const vector<double> &beta_sd, vector <
     return;
 }
 
-// LD has been set up for analyzed variants
-// xtx_vec has been setup based on snp variance and effective sample size
-double getXtX(const vector< vector<double> > &LD, const size_t &pos_i, const size_t &pos_j, const vector<double> &xtx_vec)
+// (Updated 06/15/2022 JY)
+// get correlation between pos_i and pos_j from reference
+double getXtX(const vector< vector<double> > &LD, const size_t &pos_i, const size_t &pos_j)
 {
     double xtx_ij = 0.0;
 
     if(pos_i == pos_j){
-        xtx_ij = xtx_vec[pos_i];
+        xtx_ij = 1.0;
     }
     else
     {
-        if( (pos_j - pos_i) > 0 && (pos_j - pos_i) < LD[pos_i].size()  )
+        if( (pos_j - pos_i) > 0.0 && (pos_j - pos_i) < LD[pos_i].size()  )
             {
-                xtx_ij = LD[pos_i][pos_j - pos_i] * sqrt(xtx_vec[pos_i] * xtx_vec[pos_j]);
-            }
-        else if( (pos_i - pos_j) > 0 && (pos_i - pos_j) < LD[pos_j].size() )
+                xtx_ij = LD[pos_i][pos_j - pos_i];
+            }     
+        else if( (pos_i - pos_j) > 0.0 && (pos_i - pos_j) < LD[pos_j].size() )
             {
-                xtx_ij = LD[pos_j][pos_i - pos_j] * sqrt(xtx_vec[pos_i] * xtx_vec[pos_j]);
+                xtx_ij = LD[pos_j][pos_i - pos_j];
             }
     }
 
@@ -305,43 +335,41 @@ double getXtX(const vector< vector<double> > &LD, const size_t &pos_i, const siz
 }
 
 
-
-double CalcResVar(const gsl_vector * Xty_cond, const gsl_vector * beta_cond, const double &yty)
+// (Updated 06/15/2022 JY)
+double CalcResVar(const gsl_matrix *D_cond, const gsl_vector * beta_cond)
 {
-    double rtr, xtyb;
-
-    gsl_blas_ddot(Xty_cond, beta_cond, &xtyb);
-
-    //cout << "Regression R2 in calcResVar = " << xtyb / yty << endl;
-    //cout << " beta_cond : \n"; PrintVector(beta_cond);
-    //cout << " xtyb : " << xtyb << endl;
-    //cout << "yty : " << yty << endl;
-    rtr = yty - xtyb ;
-
-    if(rtr <= 0){
-        //cout << "Regression R2 in calcResVar = " << xtyb / yty << endl;
-        perror("Nonpositive residual variance!\n");
-        cout << "Nonpositive residual variance!\n" << endl;
+    size_t s_size = D_cond->size1;
+    gsl_vector *D_beta = gsl_vector_alloc (s_size);
+    gsl_blas_dgemv(CblasNoTrans, 1, D_cond, beta_cond, 0, D_beta);
+    double R2;
+    gsl_blas_ddot (D_beta, beta_cond, &R2);
+    if( (R2 > 1.0)  || (R2 < 0.0) ){
+        cout << "Regression R2 in calcResVar = " << R2 << endl;
+        perror("Regression R2 fall out of the domain of [0, 1] ... !\n");
     }
-
-    return rtr;
+    return (1.0 - R2);
 }
 
-
-void CalcBeta(const gsl_matrix *XtX_cond, const gsl_vector * Xty_cond, gsl_vector * beta_cond)
+// (Updated 06/15/2022 JY)
+// Calculate beta_hat based on multivariable model from mbeta
+void CalcBeta(const gsl_matrix *D_cond, const gsl_vector * mbeta_cond, gsl_vector * beta_cond)
 {
-    size_t s_size = Xty_cond->size;
-
-    gsl_matrix *XtXinv = gsl_matrix_alloc(s_size, s_size);
-
-    gsl_matrix_memcpy(XtXinv, XtX_cond);
-    //cout << " XtX_cond : \n"; PrintMatrix(XtX_cond,s_size, s_size);
-    //cout << " Xty_cond : \n"; PrintVector(Xty_cond);
-
-    LapackSolve(XtXinv, Xty_cond, beta_cond);
-    //cout << " XtXinv : \n"; PrintMatrix(XtXinv,s_size, s_size);
-
-    gsl_matrix_free(XtXinv);
-
+    size_t s_size = mbeta_cond->size;
+    gsl_matrix *Dinv = gsl_matrix_alloc(s_size, s_size);
+    gsl_matrix_memcpy(Dinv, D_cond);
+    LapackSolve(Dinv, mbeta_cond, beta_cond);
+    gsl_matrix_free(Dinv);
     return ;
 }
+
+
+
+
+
+
+
+
+
+
+
+

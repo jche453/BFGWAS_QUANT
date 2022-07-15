@@ -181,7 +181,7 @@ public:
 class PARAM {
 public:
     //multiple functionrelated parameters
-    //size_t n_type;
+    size_t n_type;
     //vector<size_t> mFunc; // # of variants of each variant type
 		size_t Anum;
     double e; //hyper parameter in the prior gamma distribution
@@ -213,18 +213,18 @@ public:
 
     // SS related parameters
     string file_score;
-    string file_cov;
+    string file_corr;
     vector< vector<double> > LD_ref, LD;
-    vector<double> U_STAT, SQRT_V_STAT, pval_vec, xtx_vec, snp_var_vec;
+    vector<double> U_STAT, SQRT_V_STAT, Z_SCORE, pval_vec, xtx_vec, snp_var_vec;
     vector<double>  mbeta, mbeta_SE, ni_effect_vec;
     vector<pair<size_t, double> >  pos_ChisqTest;
 
 	bool mode_silence;
 	int a_mode;				//analysis mode, 1/2/3/4 for Frequentist tests
-	int k_mode;				//kinship read mode: 1: n by n matrix, 2: id/id/k_value;
-	size_t d_pace;
-
-  //  string file_func_code; //coded all unique variant function types
+	int k_mode;				//kinship read mode: 1: n by n matrix, 2: id/id/k_value; 
+	size_t d_pace;		
+	
+    string file_func_code; //coded all unique variant function types
     string file_sample; // file containing analyzed sample IDs
     string file_vcf;
     string GTfield;
@@ -257,7 +257,7 @@ public:
 	size_t s_step;					//number of sampling iterations
 	size_t n_accept;				//number of acceptance
 	size_t n_mh;					//number of MH steps within each iteration
-    size_t region_pip;              //number of MCMC with SNPs>0
+    double region_pip;              //number of MCMC with SNPs>0
 	long int randseed;
 	double trace_G;
 
@@ -267,8 +267,8 @@ public:
 	bool error;
 	size_t ni_total, ni_test, ni_cvt;	//number of individuals
 	size_t np_obs, np_miss;		//number of observed and missing phenotypes
-
-	size_t ns_total, ns_test, ns_snp_pos;	//number of snps
+    
+	size_t ns_total, ns_test;	//number of snps
 	size_t n_cvt;
 
 	size_t ng_total, ng_test;	//number of genes
@@ -313,8 +313,8 @@ public:
 	void CheckParam ();
 	void CheckData ();
 	void PrintSummary ();
-	void ReadGenotypes (uchar **X, gsl_matrix *K);
-	void WriteGenotypes(uchar **X);
+	void ReadGenotypes (gsl_matrix *X, gsl_matrix *K);
+	void WriteGenotypes(gsl_matrix *X);
 
 	// summary statistics;
 	void ReadSS ();

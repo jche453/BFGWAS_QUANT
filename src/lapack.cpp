@@ -676,6 +676,52 @@ double CholeskySolve(gsl_matrix *Omega, const gsl_vector *Xty, gsl_vector *OiXty
 	return logdet_O;
 }
 
+// JY edit 06/2022
+void Ginv_logdet(gsl_matrix *Omega, double &logdet){
+    size_t n_row = Omega->size1;
+    gsl_vector *svd_work = gsl_vector_alloc(n_row);
+    gsl_vector *S = gsl_vector_alloc(n_row);
+    gsl_matrix *U = gsl_matrix_alloc(n_row, n_row);
+    gsl_matrix *V = gsl_matrix_alloc(n_row, n_row);
+    gsl_linalg_SV_decomp(Omega, V, S, svd_work); // Omega is replaced by U
+    gsl_matrix_memcpy(U, Omega);
+    //cout << "SVD decomposition success"<< endl;
+    //cout << "last value of U = " << gsl_matrix_get(XtX_gtemp, s_size-1, s_size-1) << endl;
+    //cout << "first Singular value = " << gsl_vector_get(S, 0) << endl;
+    //cout << "last Singular value = " << gsl_vector_get(S, (s_size-1)) << endl;
+    //cout << "last value of V = " << gsl_matrix_get(V, s_size-1, s_size-1) << endl;
+
+    gsl_matrix * SI = gsl_matrix_alloc (n_row, n_row);
+    gsl_matrix_set_all(SI, 0.0);
+    logdet = 0.0;
+	for (size_t i = 0; i < n_row; i++) {
+        double tol = 0.000001 * gsl_vector_get(S, 0) * 0.5 * sqrt(n_row + n_row + 1);
+        if (gsl_vector_get (S, i) > tol) {
+            gsl_matrix_set (SI, i, i, (1.0 / gsl_vector_get (S, i)));
+            logdet = logdet + log(gsl_vector_get (S, i));
+        }
+    }
+
+	//THE PSEUDOINVERSE//
+	gsl_matrix * SIpUT = gsl_matrix_alloc (n_row, n_row);
+    gsl_matrix_set_all(SIpUT, 0.0);
+	gsl_blas_dgemm (CblasNoTrans, CblasTrans, 1.0, SI, U, 0.0, SIpUT);
+	gsl_blas_dgemm (CblasNoTrans, CblasNoTrans, 1.0, V, SIpUT, 0.0, Omega);
+    //cout << "persudo inverse success" << endl;
+	gsl_matrix_free(SI);
+	gsl_matrix_free(SIpUT);
+    gsl_matrix_free(U);
+	gsl_matrix_free(V);
+	gsl_vector_free(S);
+    gsl_vector_free(svd_work);
+    return;
+}
+
+
+
+
+//
+
 void Ginv(gsl_matrix *XtX_gtemp){
     
     size_t n_row = XtX_gtemp->size1;
