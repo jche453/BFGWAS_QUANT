@@ -1,6 +1,8 @@
 # Compiled source #
-Makefile
 Changes.txt
+Example/*
+test_script.sh
+
 ###################
 *.com
 *.class
@@ -36,7 +38,6 @@ Changes.txt
 .Trashes
 ehthumbs.db
 Thumbs.db
-.gitigore
 
 # Prerequisites
 *.d
@@ -71,5 +72,3 @@ Thumbs.db
 *.out
 *.app
 
-# Test script
-test_script.txt
