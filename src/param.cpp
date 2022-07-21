@@ -1,6 +1,6 @@
 /*
-	Bayesian Functional GWAS --- MCMC (BFGWAS:MCMC)
-    Copyright (C) 2018  Jingjing Yang
+	Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -94,10 +94,10 @@ void CalcWeight(const vector<bool> &indicator_func, vector<double> &weight, cons
 
 PARAM::PARAM(void):
 vscale(0.0), iniType(3), calc_K(0), saveGeno(0), saveSS(0), zipSS(0),
-inputSS(0), refLD(0), scaleN(0), printLD(0), use_xtx_LD(0), LDwindow(1000000), rv(0.0), Compress_Flag(0),
+inputSS(0), refLD(0), scaleN(0), printLD(0), LDwindow(1000000),
 mode_silence (false), a_mode (0), k_mode(1), d_pace (100000),
 GTfield("GT"), file_out("result"), 
-miss_level(0.05), maf_level(0.001), hwe_level(0.00001), r2_level(0.0001),
+miss_level(0.05), maf_level(0.001), hwe_level(0.00001), r_level(0.01),
 win(100),nadd_accept(0), ndel_accept(0), nswitch_accept(0),
 nother_accept(0), nadd(0), ndel(0),
 nswitch(0), nother(0),
@@ -323,7 +323,7 @@ void PARAM::CheckData (void) {
 			cout<<"\n## number of observed data = "<<np_obs<<endl;
 			cout<<"## number of missing data = "<<np_miss<<endl;
 		}
-		  CreateSnpPosVec(snp_pos, snpInfo, indicator_snp, Anum);
+		CreateSnpPosVec(snp_pos, snpInfo, indicator_snp, Anum);
 
     	// order snp_pos by chr/bp
     	stable_sort(snp_pos.begin(), snp_pos.end(), comp_snp);
@@ -335,7 +335,7 @@ void PARAM::CheckData (void) {
 		cout<<"## number of analyzed SNPs = "<<ns_test<<endl;
 	}else{
 		ni_total = ni_test;
-		pheno_var = 1.0; pheno_mean = 0.0; rv = 1.0;
+		pheno_var = 1.0; pheno_mean = 0.0;
 		// snp_pos was created in Readfile_Score()
     	// CreateSnpPosVec(snp_pos, snpInfo, indicator_snp);
     	// order snp_pos by chr/bp
@@ -386,14 +386,12 @@ void PARAM::ReadGenotypes (gsl_matrix *X, gsl_matrix *K) {
  
  	cout << "\nStarting reading genotype files for the second time ...\n";
     string file_str;
-    UnCompBufferSize = (ni_test) * sizeof(uchar);
-   // cout << "UnCompBufferSize = " << UnCompBufferSize << endl;
 
     if(calc_K) cout << "Kinship matrix is calculated here.\n";
 
 	if (!file_bfile.empty()) {
 		file_str=file_bfile+".bed";
-		if (ReadFile_bed (file_str, indicator_idv, indicator_snp, X, K, calc_K, ni_test, ns_test, ni_total, ns_total, SNPmean, CompBuffSizeVec, Compress_Flag)==false) {error=true;}
+		if (ReadFile_bed (file_str, indicator_idv, indicator_snp, X, K, calc_K, ni_test, ns_test, ni_total, ns_total, SNPmean)==false) {error=true;}
         //revised
 	}
 
@@ -405,7 +403,7 @@ void PARAM::ReadGenotypes (gsl_matrix *X, gsl_matrix *K) {
     }
 
     else if(!file_geno.empty()){
-        if (ReadFile_geno (file_geno, indicator_idv, indicator_snp, X, K, calc_K, ni_test, SNPmean, CompBuffSizeVec, SampleVcfPos, PhenoID2Pos, VcfSampleID, Compress_Flag)==false) {error=true;} //to be revised
+        if (ReadFile_geno (file_geno, indicator_idv, indicator_snp, X, K, calc_K, ni_test, SNPmean, SampleVcfPos, PhenoID2Pos, VcfSampleID)==false) {error=true;} //to be revised
     }else{
     	cerr << "one of the genotype files has to be specified." << endl;
     	exit(-1);
@@ -422,17 +420,17 @@ void PARAM::ReadSS (){
     		if(ReadFile_corr(file_corr, LD_ref, mapLDKey2Pos) == false)
     			{ error = true; }
 
-    		if(ReadFile_score(file_score, snp_pos, mapScoreKey2Pos, mapLDKey2Pos, pval_vec, pos_ChisqTest, Z_SCORE, ns_test, ns_total, mbeta, indicator_snp, ni_test, maf_level) == false)
+    		if(ReadFile_score(file_score, snp_pos, mapScoreKey2Pos, mapLDKey2Pos, pval_vec, pos_ChisqTest, Z_SCORE, ns_test, ns_total, mbeta, indicator_snp, ni_test, maf_level, Anum) == false)
     			{ error = true; }
 
     		// read functional/annotation fule
-			  if (!file_anno.empty()) {
+			if (!file_anno.empty()) {
 		    	cout << "\nStart loading annotation files ... \n";
 		    	//cout << file_anno << " \nwith code file " << file_func_code << "\n";
-		      if (ReadFile_anno (file_anno, mapScoreKey2Pos, indicator_snp, snpInfo, Anum)==false)
+		      if (ReadFile_anno (file_anno, mapScoreKey2Pos, snp_pos, Anum)==false)
 		        	{error=true;}
 		    }else{
-		      if (Empty_anno (indicator_snp, snpInfo, Anum)==false)
+		      if (Empty_anno (snp_pos, Anum)==false)
 		    	   {error=true;}
 		    }
   }else{
@@ -745,20 +743,16 @@ void CreateSnpPosVec(vector<SNPPOS> &snp_pos, vector<SNPINFO> &snpInfo, const ve
         key = snpInfo[i].key;
 
         if(snpInfo[i].annoscore.size() == 0) {
-          annoscore.assign(Anum, 0);
+          annoscore.assign(Anum, 0.0);
         }
         else{
           annoscore = snpInfo[i].annoscore;
         }
-
-
         SNPPOS snp_temp={pos, rs, chr, bp, a_minor, a_major, maf, annoscore, key};
         snp_pos.push_back(snp_temp);
-
         tt++;
     }
     snpInfo.clear();
-
 }
 
 
@@ -842,7 +836,7 @@ void PARAM::Convert_LD(){
             if( abs(idx_j - idx_i) >= LD_ref[ min(idx_i, idx_j) ].size() )
             	{ continue; }
             r2_ij = getR2_ij(LD_ref, idx_i, idx_j, swap_i, swap_j);
-            if(refLD && (r2_ij < r2_level))
+            if(refLD && (r2_ij < r_level))
             	{ r2_ij = 0.0; }
             LD[i].push_back(r2_ij);
     	}

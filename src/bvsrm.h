@@ -1,6 +1,6 @@
 /*
-    Bayesian Functional GWAS --- MCMC (bfGWAS:MCMC)
-    Copyright (C) 2016  Jingjing Yang
+    Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -73,12 +73,15 @@ public:
     long int LDwindow;
     vector<pair<size_t, double> > pos_ChisqTest;
     vector<double> pval_vec;
-    double pheno_mean, pheno_var, yty;
+    double pheno_mean, pheno_var, yty, rv;
 
     //multiple function related parameters
-    size_t n_type;
+    size_t n_type; // For BFGWAS_SS
+    vector<size_t> mFunc;
     size_t Anum; // # of annotation
-    vector<size_t> mFunc; // # of variants of each variant type
+    double tau_beta; // effect size precision
+    double sum_logqtheta, sum_theta; // Sum of log(1-CPP)
+    double em_gamma, sumbeta2; // sum Bayesian CPP; sum gamma * beta2
     double e, e_shape, e_rate; //hyper parameter in the prior gamma distribution
     double vscale;
     map<string, int> mapFunc2Code;
@@ -89,30 +92,24 @@ public:
     string hypfile;
     vector< pair<size_t, size_t> > SNPorder_vec; //<pos, rank>
     vector< pair<size_t, size_t> > SNPrank_vec; //<pos, order>
-    double GV, rv, tau, logrv; // GV : regression r2
+    double GV, tau, logrv; // GV : regression r2
     vector<double> mbeta, beta_mcmc; // Marginal and bayesian estimates of beta
     vector<double> mbeta_SE, xtx_vec, snp_var_vec, ni_effect_vec, yty_vec;
     bool refLD, scaleN;
     vector<double> SNPmean;
 
-
     double h, h_global;
     vector <double> rho_vec;
     vector <double> Gvec;
-    vector <double> em_gamma;
     vector <double> avector; //global hyper parameter for pi (theta)
     vector <double> bvector; // global hyper parameter for beta variance (subvar)
     vector <double> theta; // global hyper parameter
     vector <double> log_theta;
     vector <double> log_qtheta;
     vector <double> theta_total;
-    vector <double> subvar, inv_subvar, log_subvar, sumbeta2; // global hyper parameter
-
+    vector <double> subvar, inv_subvar, log_subvar; // global hyper parameter
 
 	// IO related parameters
-    size_t UnCompBufferSize;
-    vector <size_t> CompBuffSizeVec;
-    bool Compress_Flag;
 	int a_mode;
 	size_t d_pace;
     vector<pair<int, double> > UcharTable;
@@ -190,7 +187,6 @@ public:
 
 	// ************* Main Functions
 	void CopyFromParam (PARAM &cPar);
-    void CopyFromSS (CALCSS &SS) ;
 	void CopyToParam (PARAM &cPar);
 
 
@@ -210,11 +206,9 @@ public:
     // Initialize the model
     void SetPgamma (size_t p_gamma_top);
 
-    void setHyp(vector <double> avector_temp, vector <double> bvector_temp);
+    void setHyp(double tau_beta_temp);
 
-    void InitialMCMC ( gsl_matrix *UtX, const gsl_vector *Uty, vector<size_t> &rank, class HYPBSLMM &cHyp, vector<pair<size_t, double> > &pos_loglr, const vector<SNPPOS> &snp_pos);
-
-    void set_mgamma(class HYPBSLMM &cHyp, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos);
+   // void InitialMCMC ( gsl_matrix *UtX, const gsl_vector *Uty, vector<size_t> &rank, class HYPBSLMM &cHyp, vector<pair<size_t, double> > &pos_loglr, const vector<SNPPOS> &snp_pos);
 
     void WriteIniSNP (const vector<size_t> &rank, const vector<SNPPOS> &snp_pos);
 
@@ -223,7 +217,7 @@ public:
     // MH-related functions
     double ProposeGamma (const vector<size_t> &rank_old, vector<size_t> &rank_new, const class HYPBSLMM &cHyp_old, class HYPBSLMM &cHyp_new, const size_t &repeat, gsl_matrix *X, const gsl_vector *z, const gsl_matrix *Xgamma_old, const gsl_matrix *XtX_old, const gsl_vector *Xtz_old, const double &ztz, gsl_matrix *Xgamma_new, gsl_matrix *XtX_new, gsl_vector *Xtz_new);
 
-    double CalcLikegamma(const class HYPBSLMM &cHyp);
+    double CalcLikegamma(const vector<size_t> &rank);
 
     void SetXgamma (gsl_matrix *Xgamma, gsl_matrix *X, vector<size_t> &rank);
 
@@ -235,11 +229,11 @@ public:
 
     void CalcXtX (const gsl_matrix *X, const gsl_vector *y, const size_t s_size, gsl_matrix *XtX, gsl_vector *Xty);
 
-    double CalcLikelihood (const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, const class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag);
+    //double CalcLikelihood (const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, const class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag);
 
-    double CalcPosterior (const double yty, class HYPBSLMM &cHyp);
+   // double CalcPosterior (const double yty, class HYPBSLMM &cHyp);
 
-    double CalcPosterior (const gsl_matrix *Xgamma, const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, gsl_vector *Xb, gsl_vector *beta, class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag, double &loglike);
+   // double CalcPosterior (const gsl_matrix *Xgamma, const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, gsl_vector *Xb, gsl_vector *beta, class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag, double &loglike);
 
     void CalcRes(const gsl_matrix *Xgamma, const gsl_vector *z, const gsl_matrix *XtX_gamma, const gsl_vector *Xtz_gamma, gsl_vector *z_res, const size_t &s_size, const double &ztz);
 
@@ -248,7 +242,6 @@ public:
 
     double CalcLR(const gsl_vector *z_res, const gsl_vector *x_vec, size_t posj);
 
-    void getSubVec(gsl_vector *sigma_subvec, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos);
     void get_InvSigmaVec(gsl_vector *inv_sigma_subvec, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos);
     
     bool ColinearTest(gsl_matrix *X, const gsl_matrix * Xtemp, const gsl_matrix * XtX_temp, size_t r_add, size_t s_size);
@@ -273,7 +266,7 @@ public:
 
     void SetSSgammaDel (const gsl_matrix *D_old, const gsl_vector *mbeta_old, const vector<size_t> &rank_old, size_t col_id, gsl_matrix *D_new, gsl_vector *mbeta_new);
 
-    double CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gsl_vector *beta, class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag);
+    double CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gsl_vector *beta, class HYPBSLMM &cHyp, bool &Error_Flag);
 
     double CalcLR_cond_SS(const double &rtr, const size_t pos_j, const vector< vector<double> > &LD, const vector<double> &mbeta, const vector <size_t> &rank_cond, const gsl_vector *beta_cond, gsl_vector * Xtx_j);
 

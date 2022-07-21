@@ -248,23 +248,23 @@ bool ReadFile_anno (const string &file_anno, vector<SNPINFO> &snpInfo, map<strin
     return true;
 }
 
-//Empty Annotation
-bool Empty_anno (vector<bool> &indicator_snp, vector<SNPINFO> &snpInfo, size_t &Anum)
+//Empty Annotation for summary data
+bool Empty_anno (vector<SNPPOS> &snp_pos, const size_t &Anum)
 {
-    //n_type = 1; // all variants are of one annotation
-    //mFunc.assign(1, 0);
-    // cout << "indicator_snp size = " << indicator_snp.size() << endl;
-
-    for(size_t i = 0; i < indicator_snp.size(); i++){
-        if(indicator_snp[i] == 0) continue;
-        snpInfo[i].annoscore.assign(Anum, 1);
-        snpInfo[i].weight_i = 1.0 ;
-        //mFunc[0]++;
+    for(size_t i = 0; i < snp_pos.size(); i++){
+        snp_pos[i].annoscore.assign(Anum, 0.0);
     }
+    return true;
+}
 
-    //cout << "\nNumber of annotation categories: " << n_type << endl;
-    //cout << "Number of variants per category: "; PrintVector(mFunc);
-
+//Empty Annotation for individual data
+bool Empty_anno (const vector<bool> &indicator_snp, vector<SNPINFO> &snpInfo, const size_t &Anum)
+{
+    for(size_t i = 0; i < snpInfo.size(); i++){
+        if(indicator_snp[i]){
+            snpInfo[i].annoscore.assign(Anum, 0.0);
+        }
+    }
     return true;
 }
 
@@ -614,7 +614,13 @@ bool ReadFile_vcf (const string &file_vcf, const set<string> &setSnps, vector<bo
                     case 3:
                         major = s; break;
                     case 4:
-                        minor = s; break;
+                        if( s.find(',') != string::npos ){
+                            minor=s.substr(0, s.find(','));
+                        }else{
+                            minor=s ;
+                        }
+                        transform(minor.begin(), minor.end(), minor.begin(), ::toupper);
+                        break;
                     default:
                         break;
                 }
@@ -1712,7 +1718,7 @@ bool ReadFile_vcf (const string &file_vcf, vector<bool> &indicator_idv, vector<b
 
     double geno, geno_mean;
     size_t n_miss, c_idv=0, c_snp=0, ctest_snp = 0, ctest_idv=0;
-    int result;
+   // int result;
 
     char *pch, *p, *nch=NULL, *n;
     size_t tab_count;
@@ -1926,7 +1932,7 @@ bool ReadFile_vcf (const string &file_vcf, vector<bool> &indicator_idv, vector<b
 
 
 //Read genotype dosage file, the second time, recode "mean" genotype and calculate K
-bool ReadFile_geno (const string &file_geno, const vector<bool> &indicator_idv, const vector<bool> &indicator_snp, gsl_matrix *X, gsl_matrix *K, const bool calc_K, const size_t ni_test, vector<double> &SNPmean, vector <size_t> &CompBuffSizeVec, const vector <size_t> &SampleVcfPos, const map<string, size_t> &PhenoID2Pos, const vector<string> &VcfSampleID, bool Compress_Flag)
+bool ReadFile_geno (const string &file_geno, const vector<bool> &indicator_idv, const vector<bool> &indicator_snp, gsl_matrix *X, gsl_matrix *K, const bool calc_K, const size_t ni_test, vector<double> &SNPmean, const vector <size_t> &SampleVcfPos, const map<string, size_t> &PhenoID2Pos, const vector<string> &VcfSampleID)
 {
 	igzstream infile (file_geno.c_str(), igzstream::in);
 	if (!infile) {cout<<"error reading genotype file:"<<file_geno<<endl; return false;}
@@ -1935,7 +1941,7 @@ bool ReadFile_geno (const string &file_geno, const vector<bool> &indicator_idv, 
 	char *pch, *nch=NULL;
     double geno, geno_mean;
     size_t n_miss, c_idv, ctest_idv, c_snp=0, ctest_snp=0, tab_count, pheno_index;
-    int result;
+//    int result;
 
 	if (calc_K) {gsl_matrix_set_zero (K);}
 
@@ -2090,7 +2096,7 @@ bool ReadFile_geno (const string &file_geno, const vector<bool> &indicator_idv, 
 
 
 //Read BED genotype file, the second time, recode "mean" genotype and calculate K
-bool ReadFile_bed (const string &file_bed, vector<bool> &indicator_idv, vector<bool> &indicator_snp, gsl_matrix *X, gsl_matrix *K, const bool calc_K, const size_t ni_test, const size_t ns_test, const size_t ni_total, const size_t ns_total, vector<double> &SNPmean, vector <size_t> &CompBuffSizeVec, bool Compress_Flag)
+bool ReadFile_bed (const string &file_bed, vector<bool> &indicator_idv, vector<bool> &indicator_snp, gsl_matrix *X, gsl_matrix *K, const bool calc_K, const size_t ni_test, const size_t ns_test, const size_t ni_total, const size_t ns_total, vector<double> &SNPmean)
 {
 	ifstream infile (file_bed.c_str(), ios::binary);
 	if (!infile) {cout<<"error reading bed file:"<<file_bed<<endl; return false;}
@@ -2099,9 +2105,8 @@ bool ReadFile_bed (const string &file_bed, vector<bool> &indicator_idv, vector<b
 	bitset<8> b;
     double geno, geno_mean;
 	size_t n_bit, n_miss, c_idv=0, c_snp=0, c=0;
-    int result;
+ //  int result;
 
-    CompBuffSizeVec.clear();
     SNPmean.clear();
 
 	if (ni_total%4==0) {n_bit=ni_total/4;}
@@ -2187,8 +2192,6 @@ bool ReadFile_bed (const string &file_bed, vector<bool> &indicator_idv, vector<b
 
 		c_snp++;
 	}
-    //cout << "compressed Buffer size = " << compressedBufferSize << endl;
-    //cout << "CompBuffSizeVec length = " << CompBuffSizeVec.size() << endl;
 
 	if(c_snp != ns_test) cout <<"# of readed SNP not equal to ns_test \n";
 
@@ -2282,7 +2285,7 @@ void WriteVector(const gsl_vector * X, const string file_str){
 
 //Lei's change
 // Read summary score statistics file (only read for once, after LD correlation file)
-bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<string, size_t> &mapScoreKey2Pos, map<string, size_t> &mapLDKey2Pos, vector<double> &pval_vec, vector<pair<size_t, double> >  &pos_ChisqTest, vector<double> &Z_SCORE, size_t &ns_test, size_t &ns_total, vector<double> &mbeta, vector <bool> &indicator_snp, const size_t &ni_test, const double &maf_level)
+bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<string, size_t> &mapScoreKey2Pos, map<string, size_t> &mapLDKey2Pos, vector<double> &pval_vec, vector<pair<size_t, double> >  &pos_ChisqTest, vector<double> &Z_SCORE, size_t &ns_test, size_t &ns_total, vector<double> &mbeta, vector <bool> &indicator_snp, const size_t &ni_test, const double &maf_level, const size_t Anum)
 {
     string line;
     char *pch, *nch;
@@ -2291,7 +2294,7 @@ bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<strin
     long int b_pos=0;
     // dummy variable for SNPINFO
     vector<bool> indicator_func_temp;
-    vector<double> annoscore_temp;
+    vector<double> annoscore_temp(Anum, 0.0);
     // dummy variable for SNPINFO
     vector<double> weight_temp;
 
@@ -2443,7 +2446,6 @@ bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<strin
                     ns_total++;
                     //cout << "jump in third part \n"<<endl;
                     continue;
-                    
                 }
             }
 
@@ -2475,9 +2477,11 @@ bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<strin
 
 
 //Read function annotation file when reading summary statistics
-bool ReadFile_anno (const string &file_anno, map<string, size_t> &mapScoreKey2Pos,  vector<bool> &indicator_snp, vector<SNPINFO> &snpInfo, const size_t &Anum)
+bool ReadFile_anno (const string &file_anno, map<string, size_t> &mapScoreKey2Pos,vector<SNPPOS> &snp_pos, const size_t &Anum)
 {
-    cout<<"Start";
+    cout<<"Start reading annotation file..." << file_anno << endl;
+    cout << "Number of Annotation: " << Anum << endl;
+    cout << "Missing annotation values will be set as 0's ... "<< endl;
     string line;
     char *pch, *nch;
     //double AnnoMatrix [snpInfo.size()][Anum];
@@ -2494,8 +2498,6 @@ bool ReadFile_anno (const string &file_anno, map<string, size_t> &mapScoreKey2Po
             continue;
         }
         else {
-
-
             pch=(char *)line.c_str();
             nch = strchr(pch, '\t');
             chr.assign(pch, nch-pch); // chr
@@ -2523,7 +2525,6 @@ bool ReadFile_anno (const string &file_anno, map<string, size_t> &mapScoreKey2Po
             pch = (nch == NULL) ? NULL : nch+1;
 
             key = chr + ":" + to_string(b_pos) + ":" + ref + ":" + alt;
-
             // check if this SNP is in the genotype/score file
             if(mapScoreKey2Pos.count(key) == 0)
             {
@@ -2532,32 +2533,31 @@ bool ReadFile_anno (const string &file_anno, map<string, size_t> &mapScoreKey2Po
                     continue;
                 }
             } //not in the Summary Score Statistic file
-            else{ snp_i = mapScoreKey2Pos[key] ; }
-            //snpInfo[snp_i].annoscore.assign(Anum, 0);
-            if( isalpha(pch[0]) || isdigit(pch[0]) || isdigit(pch[1])){
-                //pch[0] is a letter or number
-                for(size_t j=0; j < Anum; ++j){
-                  nch = strchr(pch, ',');
-                  if (nch == NULL) {
-                    snpInfo[snp_i].annoscore.push_back(strtod(pch, NULL));
-                    if (j < (Anum - 1)) {
-                      cout << "Not enough Annotation for snp" << key << endl;
-                    }
-                  }
-                  else {
-                    snpInfo[snp_i].annoscore.push_back(strtod(pch, NULL));
+            else{
+                snp_i = mapScoreKey2Pos[key] ;
+            }
+
+            //snp_pos[snp_i].annoscore.assign(Anum, 0);
+            if( isdigit(pch[0]) ){
+                snp_pos[snp_i].annoscore[0] = strtod(pch, NULL);
+                nch = strchr(pch, ',');
+                //pch[0] is a  number
+                for(size_t j=1 ; j < Anum ; ++j){
                     pch = (nch == NULL) ? NULL : nch+1;
-                  }
+                    if (isdigit(pch[0])) {
+                        snp_pos[snp_i].annoscore[j] = strtod(pch, NULL);
+                    }
+                    if(pch != NULL) {
+                        nch = strchr(pch, ',');
+                    }else{
+                        break;
+                    }
                 }
             }
-            else{
-               cout << rs << ":chr" << chr << ":bp"<< b_pos << "has empty annotation score matrix" << endl;
-            }
-            //cout << "key: " << snpInfo[snp_i].key << "\t";
-            //cout<< "annotation0" << ": "<< snpInfo[snp_i].annoscore[0] << "\t" << "annotation1" << ": "<< snpInfo[snp_i].annoscore[1] << "\t" << "annotation2: "<< snpInfo[snp_i].annoscore[2] << endl;
+            //cout << "key: " << snp_pos[snp_i].key << "\t";
+            //cout<< "annotation0" << ": "<< snp_pos[snp_i].annoscore[0] << "\t" << "annotation1" << ": "<< snp_pos[snp_i].annoscore[1] << "\t" << "annotation2: "<< snp_pos[snp_i].annoscore[2] << endl;
         }
     }
-    cout << "Number of Annotation: " << Anum << endl;
     infile.close();
     infile.clear();
     return true;

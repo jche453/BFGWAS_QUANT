@@ -639,7 +639,7 @@ double LapackLogDet(const gsl_matrix *Omega)
     for (size_t i=0; i< OmegaTemp->size1; ++i) {
         logdet_O+=log(gsl_matrix_get (OmegaTemp, i, i));
     }
-    logdet_O*=2.0;
+    // logdet_O*=2.0;
     
     gsl_matrix_free(OmegaTemp);
     return logdet_O;

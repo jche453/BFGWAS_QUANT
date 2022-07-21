@@ -1,6 +1,6 @@
 /*
-	Bayesian Functional GWAS --- MCMC (BFGWAS:MCMC)
-    Copyright (C) 2018  Jingjing Yang
+	Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,17 +43,17 @@ using namespace std;
 
 
 BFGWAS::BFGWAS(void):	
-version("BFGWAS_SS_MCMC"), date("06/15/2022"), year("2022")
+version("BFGWAS_SS_MCMC"), date("07/20/2022"), year("2022")
 {}
 
 void BFGWAS::PrintHeader (void)
 {
 	cout<<endl;
 	cout<<"*********************************************************"<<endl;
-	cout<<"  Bayesian Functional GWAS --- MCMC (BFGWAS:MCMC) "<<endl;
+	cout<<"  Bayesian Functional GWAS with Quantitative Annotation --- MCMC (BFGWAS_QUANT:MCMC) "<<endl;
 	cout<<"  Version "<<version<<", "<<date<<"                              "<<endl;
 	cout<<"  Visit                                                 "<<endl;
-	cout<<"     https://github.com/yjingj/BFGWAS_SS      "<<endl;
+	cout<<"     https://github.com/yanglab-emory/BFGWAS_QUANT      "<<endl;
 	cout<<"  For Possible Updates                                  "<<endl;
 	cout<<"  (C) "<<year<<" Jingjing Yang              "<<endl;
 	cout<<"  GNU General Public License                            "<<endl;
@@ -163,26 +163,13 @@ void BFGWAS::PrintHelp(size_t option)
 		cout << "-Zscore     [filename]   " <<"Specify input summary Zscore statistics file"<< endl <<endl;
 		cout << "-LDcorr     [filename]   " <<"Specify reference LD R2 info"<< endl <<endl;
 		cout << "-n     [sample size]   " <<"Specify sample size for using -inputSS "<< endl <<endl;
-		cout << "-pv     [phenotype variance]   " <<"Specify phenotype variance for using -inputSS"<< endl <<endl;
-
 		cout<<" -a        [filename]     "<<" Specify input annotation file name (optional)"<<endl;
-		cout<<"          format: #CHROM, POS, ID, REF, ALT, anno1"<<endl;
-		cout<<"                  #CHROM, POS, ID, REF, ALT, anno2"<<endl;
+		cout<<"          Format (tab seperated columns): #CHROM\tPOS\tID\tREF\tALT\tanno1,anno2,anno3"<<endl;
 		cout<<"                  ..."<<endl;
-		cout<<"          in the same order as variants in the genotype file"<<endl;
 		cout<<"          missing value: NA or blank"<<endl<<endl;
-
-		cout<<" -fcode        [filename]     "<<" Specify annotation code file"<<endl<<endl;
 		cout<<" -hfile        [filename]     "<<" Specify hyper parameter values"<<endl<<endl;
 
 		//cout<<" -k        [filename]     "<<" Specify input kinship/relatedness matrix file name"<<endl<<endl;
-
-		cout<<" -snps     [filename]     "<<" Specify the variant ids that are to be analyzed"<<endl;
-		cout << "-fsample  [filename]    "<<"Specify a list of sample IDs that are to be analyzed\n";
-		cout<<"          format: rsID#1"<<endl;
-		cout<<"                  rsID#2"<<endl;
-		cout<<"                  ..."<<endl<<endl;
-
 		cout<<" -silence                 "<<" Silent terminal display"<<endl<<endl;
 
 		//cout<<" -km       [num]          "<<" Specify input kinship/relatedness file type (default 1)."<<endl;
@@ -229,7 +216,7 @@ void BFGWAS::PrintHelp(size_t option)
 		cout<<" -bvsrm	   "<<" apply BVSR model "<<endl;
 
 		cout<<" -inputSS  "<<" specify whether to use summary statistics (LD coefficients, effect-sizes) as inputs " << endl;
-		cout<<" -refLD  "<<" specify whether LD correlation comes from seperate samples " << endl;
+//		cout<<" -refLD  "<<" specify whether LD correlation comes from seperate samples " << endl;
 
 		//cout<<"   MCMC OPTIONS" << endl;
 		//cout<<"   Prior" << endl;
@@ -245,8 +232,6 @@ void BFGWAS::PrintHelp(size_t option)
 		cout<<" -win   [num]          "<<" specify the neighbourhood window size (default 100)" << endl;
 		cout<<" -w        [num]          "<<" specify burn-in steps (default 100,000)" << endl;
 		cout<<" -s        [num]          "<<" specify sampling steps (default 1,000,000)" << endl;
-		cout<<" -comp                    "<<" specify whether to impement in-memory compression (default no comp flag)" << endl;
-
 		cout<<" -initype     [num]          "<<" specify the initial model for MCMC: " << endl;
 		cout<<"          option 1: start with the most significant variant"<<endl;
 		cout<<"          option 2: start with the significant variants that acheive genome-wide significance"<<endl;
@@ -411,12 +396,12 @@ void BFGWAS::Assign(int argc, char ** argv, PARAM &cPar)
 				str.assign(argv[i]);
 				cPar.Anum=atof(str.c_str()); // read number of annotation
 		}
-		else if (strcmp(argv[i], "-r2")==0) {
+		else if (strcmp(argv[i], "-r")==0) {
 			if(argv[i+1] == NULL || argv[i+1][0] == '-') {continue;}
 			++i;
 			str.clear();
 			str.assign(argv[i]);
-			if (cPar.r2_level!=-1) {cPar.r2_level=atof(str.c_str());}
+			if (cPar.r_level!=-1) {cPar.r_level=atof(str.c_str());}
 		}
 		else if (strcmp(argv[i], "-hwe")==0) {
 			if(argv[i+1] == NULL || argv[i+1][0] == '-') {continue;}
@@ -458,14 +443,6 @@ void BFGWAS::Assign(int argc, char ** argv, PARAM &cPar)
             str.clear();
             str.assign(argv[i]);
             cPar.vscale=atof(str.c_str());
-        }
-        else if (strcmp(argv[i], "-pv")==0) {
-            if(argv[i+1] == NULL || argv[i+1][0] == '-') {continue;}
-            ++i;
-            str.clear();
-            str.assign(argv[i]);
-            cPar.rv=atof(str.c_str()); // read phenotye variance
-            cPar.pheno_var = cPar.rv;
         }
         else if (strcmp(argv[i], "-n")==0) {
 			if(argv[i+1] == NULL || argv[i+1][0] == '-') {continue;}
@@ -633,17 +610,11 @@ void BFGWAS::Assign(int argc, char ** argv, PARAM &cPar)
         else if (strcmp(argv[i], "-scaleN")==0) {
             if(argv[i+1] == NULL || argv[i+1][0] == '-') {cPar.scaleN=1; }
         }
-        else if (strcmp(argv[i], "-usextxLD")==0) {
-            if(argv[i+1] == NULL || argv[i+1][0] == '-') {cPar.use_xtx_LD=1; }
-        }
         else if (strcmp(argv[i], "-printLD")==0) {
             if(argv[i+1] == NULL || argv[i+1][0] == '-') {cPar.printLD=1; }
         }
         else if (strcmp(argv[i], "-zipSS")==0) {
             if(argv[i+1] == NULL || argv[i+1][0] == '-') {cPar.zipSS=1; }
-        }
-        else if (strcmp(argv[i], "-comp")==0) {
-            if(argv[i+1] == NULL || argv[i+1][0] == '-') {cPar.Compress_Flag=1;}
         }
 		else {cout<<"error! unrecognized option: "<<argv[i]<<endl; cPar.error=true; continue;}
 	}
@@ -836,7 +807,7 @@ void BFGWAS::BatchRun (PARAM &cPar)
 
         if(! cPar.inputSS){
 
-      gsl_vector *y=gsl_vector_alloc (cPar.ni_test); // phenotype
+      		gsl_vector *y=gsl_vector_alloc (cPar.ni_test); // phenotype
 			gsl_matrix *K=gsl_matrix_alloc (cPar.ni_test, cPar.ni_test); // kinship matrix
 
 			// set phenotype vector y
@@ -886,8 +857,6 @@ void BFGWAS::BatchRun (PARAM &cPar)
 	        	SS.WriteSS(cPar.LD, cPar.mbeta, cPar.Z_SCORE, cPar.pval_vec);
 	        	cout << "Write SS costs " << (clock()-time_start)/(double(CLOCKS_PER_SEC)*60.0) << " minutes \n";
 	        }
-	        cBvsrm.CopyFromSS(SS);
-
 	        // Using individual data
 	        //time_start=clock();
 	        //cBvsrm.MCMC(X_Genotype, y, 1); //pheno_var is calculated here

@@ -1,6 +1,6 @@
 /*
-	Bayesian Functional GWAS --- MCMC (bfGWAS:MCMC)
-    Copyright (C) 2016  Jingjing Yang
+	Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

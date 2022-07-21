@@ -1,6 +1,6 @@
 /*
-    Bayesian Functional GWAS --- MCMC (BFGWAS:MCMC)
-    Copyright (C) 2018  Jingjing Yang
+    Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,11 +32,7 @@ inline std::string to_string (const T& t)
 void BVSRM::CopyFromParam (PARAM &cPar)
 {
     VcfSampleID_test = cPar.VcfSampleID_test;
-
-    rv = cPar.rv;
-    //n_type = cPar.n_type;
     Anum = cPar.Anum;
-    //mFunc = cPar.mFunc;
     e = cPar.e;
     vscale = cPar.vscale;
     FIXHYP = cPar.FIXHYP;
@@ -48,9 +44,6 @@ void BVSRM::CopyFromParam (PARAM &cPar)
     hypfile = cPar.hypfile;
     SNPmean = cPar.SNPmean;
 
-    UnCompBufferSize = cPar.UnCompBufferSize;
-    CompBuffSizeVec = cPar.CompBuffSizeVec;
-    Compress_Flag = cPar.Compress_Flag;
     win = cPar.win;
     nadd_accept = cPar.nadd_accept;
     ndel_accept= cPar.ndel_accept;
@@ -121,26 +114,16 @@ void BVSRM::CopyFromParam (PARAM &cPar)
     return;
 }
 
-void BVSRM::CopyFromSS (CALCSS &SS) {
-    // snp_pos = SS.snp_pos;
-    UcharTable = SS.UcharTable;
-    pheno_mean = SS.pheno_mean;
-    pheno_var = SS.pheno_var;
-    //ni_test = SS.ni_test;
-    //ns_test = SS.ns_test;
-    return;
-}
-
 
 void BVSRM::CopyToParam (PARAM &cPar)
 {
-      cPar.time_Omega=time_Omega;
-      cPar.time_Proposal=time_Proposal;
-      cPar.cHyp_initial=cHyp_initial;
-      cPar.n_accept=n_accept;
-      cPar.pheno_mean=pheno_mean;
+    cPar.time_Omega=time_Omega;
+    cPar.time_Proposal=time_Proposal;
+    cPar.cHyp_initial=cHyp_initial;
+    cPar.n_accept=n_accept;
+    cPar.pheno_mean=pheno_mean;
     cPar.pheno_var = pheno_var;
-      cPar.randseed=randseed;
+    cPar.randseed=randseed;
 
     cPar.nadd_accept=nadd_accept;
     cPar.ndel_accept=ndel_accept;
@@ -294,7 +277,7 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
     ofstream outfile (file_str.c_str(), ofstream::out);
     if (!outfile) {cout<<"error writing file: "<<file_str.c_str()<<endl; return;}
 
-    outfile<<"#CHR\tPOS\tID\tREF\tALT\tMAF\tAnnoFunc_code\tPi\tBeta\tmBeta\tChisqTest\tPval_svt\tRank" << endl;
+    outfile<<"#CHR\tPOS\tID\tREF\tALT\tMAF\tPi\tBeta\tmBeta\tChisqTest\tPval_svt\tRank\tAnno" << endl;
 
     size_t r, n_causal;
     vector<size_t> rank_vec; // Save positions of potential causal SNPs
@@ -302,8 +285,8 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
 
     double pi_temp;
     beta_mcmc.assign(ns_test, 0.0); // Bayesian estimates of beta
-    em_gamma.assign(n_type, 0.0); //save sum of gamma;
-    sumbeta2.assign(n_type, 0.0); // save sum of gamma * beta2
+    em_gamma = 0.0; //save sum of gamma;
+    sumbeta2 = 0.0; // save sum of gamma * beta2
 
     n_causal = 0;
     for (size_t i=0; i<ns_test; ++i) {
@@ -321,10 +304,6 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
     size_t pos_i, pos_j;
     double xtx_ij;
     if(r_size > 1) {
-        gsl_vector *inv_sigma_subvec = gsl_vector_alloc (r_size);
-        get_InvSigmaVec(inv_sigma_subvec, rank_vec, snp_pos);
-        // cout << "inv_sigma_subvec = "; PrintVector(inv_sigma_subvec);
-
         gsl_matrix *D_gamma = gsl_matrix_alloc(r_size, r_size);
         gsl_vector *mbeta_gamma = gsl_vector_alloc(r_size);
         gsl_vector *beta_hat = gsl_vector_alloc(r_size); // calculate posterior beta
@@ -340,8 +319,8 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
             }
         }
         gsl_vector_view D_diag = gsl_matrix_diagonal(D_gamma);
-        gsl_vector_add(&D_diag.vector, inv_sigma_subvec);
-        // posterior estimates of beta
+        gsl_vector_add_constant(&D_diag.vector, tau_beta);
+        // posterior Bayesian estimates of beta
         if(LapackSolve(D_gamma, mbeta_gamma, beta_hat)!=0)
             EigenSolve(D_gamma, mbeta_gamma, beta_hat);
         for (size_t i=0; i<ns_test; ++i) {
@@ -353,18 +332,6 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
                 outfile << scientific << setprecision(3)  << snp_pos[i].maf << "\t";
             }
 
-            //Lei's note (7/10)
-            //for (size_t j=0; j < n_type; j++) {
-                //if (snp_pos[i].indicator_func[j]) {
-                    //outfile << j << "\t";
-                    //break;
-                //}
-                //else if(j == (n_type - 1)) {
-                    //outfile << "NA" << "\t";
-                //}
-            //}
-
-
             if (beta_g[i].second > 0.0) {
                 pi_temp = beta_g[i].second/(double)s_step;
                 if(mapRank2Vec[r]){
@@ -373,28 +340,32 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
                     beta_mcmc[i] = 0.0;
                 }
                 outfile << pi_temp << "\t" << beta_mcmc[i] << "\t" << mbeta[i]  << "\t" ;
-                //Lei's note: 
-                for (size_t j=0; j < n_type; j++) {
-                    /*if (snp_pos[i].indicator_func[j]!=0) {
-                        em_gamma[j] += pi_temp ;
-                        sumbeta2[j] += pi_temp * beta_mcmc[i] * beta_mcmc[i];
-                        break;
-                    }*/
-                    em_gamma[j] += pi_temp ;
-                    sumbeta2[j] += pi_temp * beta_mcmc[i] * beta_mcmc[i];
-                }
+                em_gamma = em_gamma + pi_temp ;
+                sumbeta2 = sumbeta2 + pi_temp * beta_mcmc[i] * beta_mcmc[i] ;
             }
             else {
                 pi_temp = 0.0;
                 outfile << 0.0 << "\t" << 0.0 << "\t" << mbeta[i] << "\t";
             }
             outfile << scientific << setprecision(3) << pos_ChisqTest[r].second << "\t"<< pval[r] << "\t" ;
-            outfile << r << endl;
+            outfile << r << "\t";
+
+            for(size_t j = 0; j < snp_pos[i].annoscore.size(); ++j)
+            {
+                if(j < (snp_pos[i].annoscore.size() -1))
+                {
+                    outfile << snp_pos[i].annoscore[j] << "," ;
+                }
+                else{
+                    outfile << snp_pos[i].annoscore[j] << endl ;
+                }
+            }
         }
         gsl_matrix_free(D_gamma);
         gsl_vector_free(mbeta_gamma);
         gsl_vector_free(beta_hat);
-    } else{
+    }
+    else{
         for (size_t i=0; i<ns_test; ++i) {
             r = mapPos2Rank[i]; //map to rank
             outfile<<snp_pos[i].chr<<"\t"<<snp_pos[i].bp<<"\t"<<snp_pos[i].rs<<"\t"<< snp_pos[i].a_major<<"\t"<<snp_pos[i].a_minor<<"\t" ;
@@ -404,35 +375,30 @@ void BVSRM::WriteParam_SS(vector<pair<double, double> > &beta_g, const vector<SN
                 outfile << scientific << setprecision(3)  << snp_pos[i].maf << "\t";
             }
 
-            //Lei's note (7/10)
-            //for (size_t j=0; j < n_type; j++) {
-                //if (snp_pos[i].indicator_func[j]) {
-                    //outfile << j << "\t";
-                    //break;
-                //}
-                //else if(j == (n_type - 1)) {
-                    //outfile << "NA" << "\t";
-                //}
-            //}
-
-
             if (beta_g[i].second > 0.0) {
                 pi_temp = beta_g[i].second/(double)s_step;
                 beta_mcmc[i] = beta_g[i].first/(double)s_step;
                 outfile << pi_temp << "\t" << beta_mcmc[i] << "\t" << mbeta[i]  << "\t" ;
-                
-                //Lei's note: 
-                for (size_t j=0; j < n_type; j++) {
-                    em_gamma[j] += pi_temp ;
-                    sumbeta2[j] += pi_temp * beta_mcmc[i] * beta_mcmc[i];
-                }
+                em_gamma = em_gamma + pi_temp ;
+                sumbeta2 = sumbeta2 + pi_temp * beta_mcmc[i] * beta_mcmc[i] ;
             }
             else {
                 pi_temp = 0.0;
                 outfile << 0.0 << "\t" << 0.0 << "\t" << mbeta[i] << "\t";
             }
             outfile << scientific << setprecision(3) << pos_ChisqTest[r].second << "\t"<< pval[r] << "\t" ;
-            outfile << r << endl;
+            outfile << r << "\t";
+
+            for(size_t j = 0; j < snp_pos[i].annoscore.size(); ++j)
+            {
+                if(j < (snp_pos[i].annoscore.size() -1))
+                {
+                    outfile << snp_pos[i].annoscore[j] << "," ;
+                }
+                else{
+                    outfile << snp_pos[i].annoscore[j] << endl ;
+                }
+            }
         }
     }
     outfile.clear();
@@ -959,26 +925,21 @@ double BVSRM::CalcPveLM (const gsl_matrix *UtXgamma, const gsl_vector *Uty, cons
 }
 
 
-void BVSRM::setHyp(vector <double> avector_temp, vector <double> bvector_temp)
+void BVSRM::setHyp(double tau_beta_temp)
 {
 
     // Default initial values
-    cout << "rv = phenotype variance  = " << rv << endl;
-    tau = 1.0 / rv;
-    cout << "after set, tau = " << tau << endl;
-    //logrv = log(2.0 * M_PI * rv); cout << "log(2pi*rv) = " <<logrv << endl;
-    avector.clear();
-    bvector.clear();
-    avector.assign((Anum+1), 0);
-    bvector.assign((Anum+1), 0);
+    //cout << "Anum = " << Anum <<endl;
+    tau = 1.0 ;
+    avector.assign((Anum+1), 0.0);
+    avector[0] = -10.0;
+    tau_beta = tau_beta_temp;
 
     //cout << "load fixed parameter a & b vector from : " << hypfile << endl;
     string line;
     char *pch, *nch;
-    size_t anno_idx = 0;
-    double thetasum = 0;
-    double theta_value = 0;
-    double sigma2_value = 0;
+    size_t anno_idx;
+    double theta_value = 0.0;
 
     if (hypfile.empty()) {
         cout << "Did not specify hypefile, use default values ...\n";
@@ -991,82 +952,93 @@ void BVSRM::setHyp(vector <double> avector_temp, vector <double> bvector_temp)
         }
         //cout << "load hyp from hypfile... " << hypfile << endl;
         while (!safeGetline(infile, line).eof()) {
-            if ((line[0] == 'h') || (line[0] == '#') || (line[0] == 'p')) {
+            if (line[0] == '#') {
                 continue;
             }
-            else{
+            else if (line[0] == 'a'){
                 pch = (char *)line.c_str();
                 nch = strchr(pch, '\t');
-                //cout << "pch:" << "\t" << pch << "\t" << "nch:" << nch << "\t";
-                if(anno_idx < (Anum + 1)){
-                    avector[anno_idx] = strtod(pch, NULL);
-                    //cout << "a:" << avector[anno_idx] << "\t";
-                    //cout << "nch" << nch;
-                    if(nch == NULL){
-                      cerr << "Need input initial hyper parameter value for b \n";
-                      exit(-1);
+                pch = (nch == NULL) ? NULL : nch+1;
+                avector[0] = strtod(pch, NULL);
+                anno_idx = 1;
+                while(pch != NULL){
+                    nch = strchr(pch, ',');
+                    pch = (nch == NULL) ? NULL : nch+1;
+                    if (anno_idx <= Anum ){
+                        avector[anno_idx] = strtod(pch, NULL);
+                        anno_idx++;
                     }
-                    else{
-                        pch = (nch == NULL) ? NULL : nch+1;
-                        nch = strchr(pch, '\t');
-                        bvector[anno_idx] = strtod(pch, NULL);;
-                        //cout << "b:" << bvector[anno_idx] << endl;
-                    }
-                    anno_idx++;
                 }
             }
+            else if (line[0] == 't'){
+                pch = (char *)line.c_str();
+                nch = strchr(pch, '\t');
+                pch = (nch == NULL) ? NULL : nch+1;
+                tau_beta = strtod(pch, NULL);
+            }
+            else{ break; }
         }
         infile.clear();
         infile.close();
     }
+    cout << "Prior avector : ";
+    PrintVector(avector) ;
+    cout << "Prior tau_beta = " << tau_beta << endl;
 
     theta.clear();
-    subvar.clear();
-    //cout << "Anum = " << Anum <<endl;
+    // setup theta vector from enrichment coefficient avector
+    cout << "snp_pos.size() = " << snp_pos.size() << endl;
+    cout << "ns_test = " << ns_test << endl;
     for (size_t i=0; i < snp_pos.size(); ++i){
         theta_value = avector[0];
-        sigma2_value = bvector[0];
-        //cout << snp_pos[i].rs << "\t";
-        for (size_t j=0; j < Anum; ++j){
-          //cout << snp_pos[i].annoscore[j] << "\t";
-          theta_value = theta_value + avector[j+1] * snp_pos[i].annoscore[j];
-          //sigma2_value = sigma2_value + bvector[j+1] * snp_pos[i].annoscore[j];
+        if(snp_pos[i].annoscore.size() > 0){
+            for (size_t j=0; j < snp_pos[i].annoscore.size(); ++j){
+              theta_value = theta_value + avector[j+1] * snp_pos[i].annoscore[j];
+            }
+        }else{
+            cout << snp_pos[i].key << endl;
+            cout << "snp_pos[i].annoscore is empty ... \n" ;
         }
-        //sigma2_value = 0;
-        //sigma2_value = exp(sigma2_value);
-        theta_value = exp(theta_value) / (1 + exp(theta_value));
-        //theta_value = 0.000001;
+        theta_value = exp(theta_value) / (1.0 + exp(theta_value));
         theta.push_back(theta_value);
-        subvar.push_back(sigma2_value);
+        if(i < 10){
+            cout << snp_pos[i].key << endl;
+            cout << "snp_pos[i].annoscore : " ;
+            PrintVector(snp_pos[i].annoscore);
+            cout << "Prior CPP theta = " << theta[i] << endl;
+        }
+    }
 
+    sum_theta = 0.0 ;
+    cout << "\n theta.size() = " << theta.size() << endl;
+    for (size_t i=0; i < theta.size(); ++i){
+        sum_theta = sum_theta + theta[i];
+    }
+    cout << "sum_theta: " << sum_theta << endl;
+
+    // scale prior causal probability
+    if ( ((double)(snp_pos.size()) / 1000000.0) < sum_theta) {
+      cout << "Scale prior CPP to 1e-6 per SNP ... \n";
+      for (size_t i=0; i < snp_pos.size(); ++i){
+        theta[i] = (theta[i] / sum_theta) * ((double)(snp_pos.size()) / 1000000.0);
+      }
     }
 
     log_theta.clear();
     log_qtheta.clear();
+    sum_logqtheta = 0.0;
     for (size_t i=0; i < snp_pos.size(); ++i){
-        thetasum = thetasum + theta[i];
-    }
-    cout << "thetasum: " << thetasum << endl;
-
-    if ((snp_pos.size() / 1000000) < (thetasum)) {
-      for (size_t i=0; i < snp_pos.size(); ++i){
-        theta.at(i) = theta[i] / thetasum * snp_pos.size() / 1000000;
-        //cout << snp_pos[i].rs << " theta:" << theta[i] << " subvar:" << subvar[i] << endl;
-        //theta.at(i) = theta[i] / (snp_pos.size() * thetasum);
-      }
-    }
-
-
-    for(size_t i=0; i < snp_pos.size(); ++i){
-        cout << snp_pos[i].rs << ":" << theta[i] << endl;
         log_theta.push_back(log(theta[i]));
         log_qtheta.push_back(log(1.0 - theta[i]));
+        sum_logqtheta += log_qtheta[i] ;
     }
+    cout << "sum of log( 1 - CPP ) of all SNPs : " << sum_logqtheta << endl;
 }
 
 
 //InitialMCMC currently used
 //Lei's change
+/*
 void BVSRM::InitialMCMC (gsl_matrix *X, const gsl_vector *Uty, vector<size_t> &rank, class HYPBSLMM &cHyp, vector<pair<size_t, double> > &pos_loglr, const vector<SNPPOS> &snp_pos)
 
 {
@@ -1092,9 +1064,7 @@ void BVSRM::InitialMCMC (gsl_matrix *X, const gsl_vector *Uty, vector<size_t> &r
         size_t orderj, rankj;
 
         cout << "Start loading initial snp IDs from " << iniSNPfile << "\n";
-
         while (!safeGetline(infile, lineid).eof()) {
-
             orderj = 0;
             for (size_t i=0; i < snp_pos.size(); i++) {
                 if (snp_pos[i].rs.compare(lineid) == 0) {
@@ -1308,18 +1278,6 @@ void BVSRM::InitialMCMC (gsl_matrix *X, const gsl_vector *Uty, vector<size_t> &r
     // cout << "initial sigma_a2 = " << sigma_a2 << endl;
 
     //cHyp.rho=CalcPveLM (UtXgamma, Uty, sigma_a2)/cHyp.h;
-    vector <double> atemp_old;
-    if (trace_G!=0) {
-        atemp_old = avector;
-    } else {
-        atemp_old.assign((Anum+1), 0);
-    }
-    vector <double> btemp_old;
-    if (trace_G!=0) {
-        btemp_old =  bvector;
-    } else {
-        btemp_old.assign((Anum+1), 0);
-    }
     gsl_matrix_free (UtXgamma);
 
     //if (cHyp.rho>1.0) {cHyp.rho=1.0;}
@@ -1329,106 +1287,36 @@ void BVSRM::InitialMCMC (gsl_matrix *X, const gsl_vector *Uty, vector<size_t> &r
     //if (cHyp.rho>rho_max) {cHyp.rho=rho_max;}
     if (cHyp.logp<logp_min) {cHyp.logp=logp_min;}
     if (cHyp.logp>logp_max) {cHyp.logp=logp_max;}
+
     //cout << "start setHyp... \n";
-    setHyp(atemp_old, btemp_old);
+    double tau_beta_temp = 0.1;
+    setHyp(tau_beta_temp);
 
     cHyp.theta = theta;
     cHyp.log_theta = log_theta;
-    cHyp.subvar = subvar; // initial subvar vector
 
-    // cout<<"initial value of h = "<< h <<endl;
-    // cout<<"initial value of rho = "<<cHyp.rho<<endl;
     // cout<<"initial value of theta_vec = "; PrintVector(theta);
-    // cout << "initial value of sub-variance_vec = "; PrintVector(subvar);
     cout<<"Initially selected number of variants in the model = "<<cHyp.n_gamma<<endl;
-
     return;
 }
-
-// for the new model
-double BVSRM::CalcPosterior (const double yty, class HYPBSLMM &cHyp)
-{
-    double logpost=0.0;
-
-    //for quantitative traits, calculate pve and pge
-    //pve and pge for case/control data are calculted in CalcCC_PVEnZ
-    if (a_mode==11) {
-        cHyp.pve=0.0;
-     //   cHyp.pge=1.0;
-    }
-    //calculate likelihood
-   // if (a_mode==11) {logpost-=0.5*(double)ni_test*log(yty);}
-   // else {logpost-=0.5*yty;}
-
-    // calculate gamma likelihood
-    //logpost += CalcLikegamma(cHyp);
-
-    return logpost;
-}
-
-
-//Used for EM-Block
-void BVSRM::getSubVec(gsl_vector *sigma_subvec, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos)
-{
-    size_t order_i;
-    for (size_t i=0; i < rank.size(); i++) {
-        order_i = mapRank2Order[rank[i]];
-        gsl_vector_set(sigma_subvec, i, subvar[order_i]);
-    }
-}
-
-//Used for EM-Block
-//Lei's note (7/10)
-//orginal
-/*void BVSRM::get_InvSigmaVec(gsl_vector *inv_sigma_subvec, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos)
-{
-    size_t order_i;
-    for (size_t i=0; i < rank.size(); i++) {
-        order_i = mapRank2Order[rank[i]];
-        for (size_t j=0; j<n_type; j++) {
-            if (snp_pos[order_i].indicator_func[j]) {
-                gsl_vector_set(inv_sigma_subvec, i, inv_subvar[j]);
-                continue;
-            }
-        }
-    }
-}*/
-
-void BVSRM::get_InvSigmaVec(gsl_vector *inv_sigma_subvec, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos)
-{
-    size_t order_i;
-    for (size_t i=0; i < rank.size(); i++) {
-        order_i = mapRank2Order[rank[i]];
-        gsl_vector_set(inv_sigma_subvec, i, inv_subvar[order_i]);
-        continue;
-    }
-}
-
-//set sigma_subvec and mgamma vectoer and trace vector Gvec
-
-//used in EM-block
-//Lei's change
-void BVSRM::set_mgamma(class HYPBSLMM &cHyp, const vector<size_t> &rank, const vector<SNPPOS> &snp_pos)
-{
-    size_t order_i;
-    cHyp.m_gamma.assign(n_type, 0);
-    for (size_t i=0; i < rank.size(); i++) {
-        order_i = mapRank2Order[rank[i]] ;
-        cHyp.m_gamma[order_i]++;
-    }
-}
+*/
 
 
 //used in EM_BLock
-double BVSRM::CalcLikegamma(const class HYPBSLMM &cHyp)
+double BVSRM::CalcLikegamma(const vector<size_t> &rank)
 {
-    double loglikegamma = 0.0;
-    for (size_t i=0; i < n_type; i++) {
-        loglikegamma +=  log_theta[i] * ((double)cHyp.m_gamma[i]) + ((double)(mFunc[i] - cHyp.m_gamma[i])) * log_qtheta[i];
+    double loglikegamma = sum_logqtheta;
+    size_t pos_i;
+    if(rank.size() > 0){
+        for (size_t i=0; i < rank.size(); i++) {
+            pos_i = mapRank2pos[i] ;
+            loglikegamma +=  loglikegamma + (log_theta[pos_i] - log_qtheta[pos_i]);
+        }
     }
     return loglikegamma;
 }
 
+/*
 // for the new model
 double BVSRM::CalcPosterior (const gsl_matrix *Xgamma, const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, gsl_vector *Xb, gsl_vector *beta, class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag, double &loglike)
 {
@@ -1466,70 +1354,11 @@ double BVSRM::CalcPosterior (const gsl_matrix *Xgamma, const gsl_matrix *XtX, co
     gsl_blas_ddot (&Xty_sub.vector, beta_hat, &bxy);
     double R2 = bxy / yty;
 
-
-   /* double lambda = 0.0;
-    for (size_t i=0; i<s_size; ++i) {
-        lambda += gsl_matrix_get(Omega, i, i);
-    }
-    lambda /= (double)s_size;
-    lambda *= 0.01;
-
-    int k=0;*/
-
     if (R2 > 1.0 || R2 < -0.0) {
 
         //cout << "R2 in CalcPosterior = " << R2 << endl;
         Error_Flag=1;
-        /*
-        WriteMatrix(&Xgamma_sub.matrix, "_X");
-        WriteMatrix(&XtX_sub.matrix, "_XtX");
-        WriteMatrix(Omega, "_Omega");
-        WriteVector(&sigma_sub.vector, "_sigma");
-        WriteVector(&Xty_sub.vector, "_Xty");
-        WriteVector(beta_hat, "_beta");
-        // Error_Flag = 1;
-        //cerr << "Error in calcPosterior: P_yy = " << P_yy << endl;
-        //cout << "est beta_hat: "; PrintVector(beta_hat);
-        // exit(-1);
-
-        while (R2 > 1.1 || R2 < -0.1) {
-
-            cout << "add lambda : negative R2 in calcposterior..." << R2 << "; k = " << k<< endl;
-
-         gsl_vector_add_constant(&Omega_diag.vector, lambda);
-         if(LapackSolve(Omega, &Xty_sub.vector, beta_hat)!=0)
-             EigenSolve(Omega, &Xty_sub.vector, beta_hat);
-         gsl_blas_ddot (&Xty_sub.vector, beta_hat, &bxy);
-            R2 = bxy / yty;
-            k++;
-            cout << "now R2 = " << R2 << "; k = " << k << endl;
-
-            if (k > 9) {
-                cout << "reached k = " << k << endl;
-                break;
-            }
-        }
-
-        if (R2 > 1.0 || R2 < -0.0) {
-            bxy=0.0;
-            cHyp.pve=0.0;
-
-            gsl_vector_set_zero(&beta_sub.vector);
-            Error_Flag=1;
-        }
-        else{
-            Error_Flag=0;
-            gsl_vector_memcpy(&beta_sub.vector, beta_hat);
-            gsl_blas_dgemv (CblasNoTrans, 1.0, &Xgamma_sub.matrix, &beta_sub.vector, 0.0, Xb);
-            gsl_blas_ddot (Xb, Xb, &d);
-            if (a_mode==11) {
-                cHyp.pve=d/(double)ni_test;
-                //cHyp.pve/=cHyp.pve+1.0/tau;
-                // cHyp.pge=1.0;
-            }
-        }*/
     }
-
     else{
         Error_Flag=0;
         gsl_vector_memcpy(&beta_sub.vector, beta_hat);
@@ -1552,7 +1381,9 @@ double BVSRM::CalcPosterior (const gsl_matrix *Xgamma, const gsl_matrix *XtX, co
 
     return logpost;
 }
+*/
 
+/*
 // for the new model
 //calculate likelihood P(Y | gamma, subvar, theta)
 double BVSRM::CalcLikelihood (const gsl_matrix *XtX, const gsl_vector *Xty, const double yty, const class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag)
@@ -1621,6 +1452,7 @@ double BVSRM::CalcLikelihood (const gsl_matrix *XtX, const gsl_vector *Xty, cons
 
     return loglike;
 }
+*/
 
 
 //currently used
@@ -1866,25 +1698,13 @@ void BVSRM::WriteHyptemp(gsl_vector *LnPost){
     outfile_hyp.open (file_hyp.c_str(), ofstream::out);
     if (!outfile_hyp) {cout<<"error writing file: "<<file_hyp<<endl; return;}
     cout << "Start writing hyptemp ... \n" ;
+    cout << "Sum CPP = " << em_gamma << endl;
 
     // Add a file header starting with # (06/15/2022)
-    outfile_hyp << "#genome_block_prefix\tlog_post_likelihood\tr2";
-    for(size_t i=0; i < n_type; i++){
-        outfile_hyp << "\tmFunc_" <<i <<"\tsum_gamma_"<< i << "\tsum_Ebeta2_" <<i;
-    }
-    outfile_hyp <<endl;
-
+    outfile_hyp << "#genome_block_prefix\tlog_post_likelihood\tr2\tsum_gamma\tsum_beta2\n";
     outfile_hyp << file_out << "\t"; //genome_block_prefix
     // log_pos_likelihood ; r2 ;
-    outfile_hyp << scientific << setprecision(3) << em_logpost << "\t" << (GV / (double)s_step) ;
-    
-    for(size_t i=0; i < n_type; i++){
-        // number of SNPs per annotation; sum gamma; sum gamma*beta2
-        outfile_hyp << "\t" << mFunc[i] ;
-        outfile_hyp << "\t" << em_gamma[i] ;
-        outfile_hyp << "\t" << sumbeta2[i] ;
-    }
-    outfile_hyp << endl;
+    outfile_hyp << scientific << setprecision(3) << em_logpost << "\t" << (GV / (double)s_step) << "\t" << em_gamma << "\t"  << sumbeta2 << endl;
 
     outfile_hyp.clear();
     outfile_hyp.close();
@@ -1892,7 +1712,7 @@ void BVSRM::WriteHyptemp(gsl_vector *LnPost){
 
 
 
-
+/*
 //MCMC function (old version; not used)
 // lei's change
 void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
@@ -1961,7 +1781,7 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
     vector<double> Z_scores;
 
     cout << "Calculating Z_scores, standard errors of effect-sizes, LRT statistics, pvals ... \n";
-    MatrixCalcLmLR (indicator_snp,X, z, pos_loglr, ns_test, ni_test, SNPmean, Gvec, xtx_vec, Z_scores, mbeta, mbeta_SE, pval_lrt, snp_pos, CompBuffSizeVec, UnCompBufferSize, Compress_Flag, UcharTable); //calculate trace_G or Gvec, Z_scores, beta_SE
+    MatrixCalcLmLR (indicator_snp,X, z, pos_loglr, ns_test, ni_test, SNPmean, Gvec, xtx_vec, Z_scores, mbeta, mbeta_SE, pval_lrt, snp_pos); //calculate trace_G or Gvec, Z_scores, beta_SE
  //calculate trace_G or Gvec
     trace_G = VectorSum(Gvec) / double(ns_test);
     cout << "Trace of Genotype Matrix = " << trace_G << endl;
@@ -2057,7 +1877,7 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
     cout << "Initial number of selected variants per category : ";
     PrintVector(cHyp_old.m_gamma); 
     //cout << "Set sigma_subvec... \n";
-    getSubVec(sigma_subvec_old, rank_old, snp_pos);
+    // getSubVec(sigma_subvec_old, rank_old, snp_pos);
     //PrintVector(sigma_subvec_old, rank_old.size());
 
     cHyp_initial=cHyp_old;
@@ -2066,12 +1886,12 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
     //Calculate first loglikelihood
     //cout << "first calculating logpost ... \n";
     if (cHyp_old.n_gamma==0) {
-        loglikegamma = CalcLikegamma(cHyp_old);
+        loglikegamma = CalcLikegamma(rank_old);
         logPost_old = CalcPosterior (ztz, cHyp_old) + loglikegamma;
         loglike_old = loglikegamma;
     }
     else {
-        loglikegamma = CalcLikegamma(cHyp_old);
+        loglikegamma = CalcLikegamma(rank_old);
         logPost_old = CalcPosterior (Xgamma_old, XtX_old, Xtz_old, ztz, Xb_old, beta_old, cHyp_old, sigma_subvec_old, Error_Flag, loglike_old) + loglikegamma;
         loglike_old += loglikegamma;
     }
@@ -2125,14 +1945,14 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
 
             //First proposal need to be revised
             if (cHyp_old.n_gamma==0) {
-                loglikegamma = CalcLikegamma(cHyp_old);
+                loglikegamma = CalcLikegamma(rank_old);
                 logPost_old = CalcPosterior (ztz, cHyp_old) + loglikegamma;
                 loglike_old = loglikegamma;
             } else {
                 gsl_matrix_view Xold_sub=gsl_matrix_submatrix(Xgamma_old, 0, 0, ni_test, rank_old.size());
                 gsl_vector_view Xtz_sub=gsl_vector_subvector(Xtz_old, 0, rank_old.size());
                 gsl_blas_dgemv (CblasTrans, 1.0, &Xold_sub.matrix, z, 0.0, &Xtz_sub.vector);
-                loglikegamma = CalcLikegamma(cHyp_old);
+                loglikegamma = CalcLikegamma(rank_old);
                 logPost_old = CalcPosterior (Xgamma_old, XtX_old, Xtz_old, ztz, Xb_old, beta_old, cHyp_old, sigma_subvec_old, Error_Flag, loglike_old) + loglikegamma;
                 loglike_old += loglikegamma;
             }
@@ -2164,13 +1984,13 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
             if (rank_new.size() > 0) {
                 set_mgamma(cHyp_new, rank_new, snp_pos);
                 getSubVec(sigma_subvec_new, rank_new, snp_pos);
-                loglikegamma = CalcLikegamma(cHyp_new);
+                loglikegamma = CalcLikegamma(rank_new);
                 logPost_new = CalcPosterior (Xgamma_new, XtX_new, Xtz_new, ztz, Xb_new, beta_new, cHyp_new, sigma_subvec_new, Error_Flag, loglike_new) + loglikegamma;
                 loglike_new += loglikegamma;
             }
             else {
                 cHyp_new.m_gamma.assign(n_type, 0);
-                loglikegamma = CalcLikegamma(cHyp_new);
+                loglikegamma = CalcLikegamma(rank_new);
                 logPost_new = CalcPosterior (ztz, cHyp_new) + loglikegamma;
                 loglike_new = loglikegamma;
             }
@@ -2300,13 +2120,7 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
                     betai = gsl_vector_get(beta_old, i);
                     beta_g[pos].first += betai;
                     beta_g[pos].second += 1.0;
-                    //Lei's note (7/10):
-                    /*for (size_t j=0; j < n_type; j++) {
-                        if (snp_pos[order_i].indicator_func[j]) {
-                            sumbeta2[j] += betai * betai;
-                            break;
-                        }
-                    }*/
+
                     snps_mcmc_temp += string(snp_pos[order_i].rs) + string(":") + string(snp_pos[order_i].chr) + string(":") + to_string(snp_pos[order_i].bp) + string(":") + to_string(snp_pos[order_i].a_major) + string(":") + to_string(snp_pos[order_i].a_minor)+ string(";");
                 }
                 snps_mcmc.push_back(snps_mcmc_temp);
@@ -2383,6 +2197,7 @@ void BVSRM::MCMC (gsl_matrix *X, const gsl_vector *y, bool original_method) {
 
     return;
 }
+*/
 // end of current version
 
 
@@ -2999,7 +2814,7 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
     //PrintVector(ni_effect_vec, 3);
 
     // standardized phenotype with variance 1
-    rv = 1;
+    rv = 1.0;
 
     clock_t time_start;
     time_Proposal = 0.0;
@@ -3012,7 +2827,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
     gsl_vector_set_zero(sigma_subvec_new);
     gsl_vector *LnPost = gsl_vector_alloc(s_step); //save logPost...
     GV = 0.0;  // save regression R2
-    Gvec.assign(n_type, 0.0);
     
     // let D represent correlation matrix; mbeta
     gsl_matrix *D_old=gsl_matrix_alloc (s_max, s_max);
@@ -3063,7 +2877,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
         time_t rawtime;
         time (&rawtime);
         tm * ptm = gmtime (&rawtime);
-
         randseed = (unsigned) (ptm->tm_hour%24*3600+ptm->tm_min*60+ptm->tm_sec);
     }
     gsl_r = gsl_rng_alloc(gslType);
@@ -3085,35 +2898,11 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
     //Initial parameters
     cout << "\nStart initializing MCMC ... \n";
     InitialMCMC_SS (LD, rank_old, cHyp_old, pval_vec); // Initialize rank and cHyp
-    //cout << "Initial rank_old : "; 
-    // PrintVector(rank_old);
-    //cout << "log_theta: "; PrintVector(log_theta);
-    //cout << "log_qtheta: "; PrintVector(log_qtheta);
-    //cout << "mFunc : "; PrintVector(mFunc);
-    
-    inv_subvar.assign(n_type, 0.0), log_subvar.assign(n_type, 0.0);
-    for(size_t i=0; i < n_type; i++){
-        inv_subvar[i] = (1.0 / subvar[i]); 
-        log_subvar[i] = (log(subvar[i])); 
-    }
-    cout << "inv_subvar = "; PrintVector(inv_subvar);
-    //cout << "log_subvar = "; PrintVector(log_subvar);
-    
     if (cHyp_old.n_gamma > 0) SetSSgamma(LD, mbeta, rank_old, D_old, mbeta_old);
-    
-    //cout << "Set m_gamma... \n";
-    set_mgamma(cHyp_old, rank_old, snp_pos);
-    cout << "Initial number of selected variants per category : ";
-    PrintVector(cHyp_old.m_gamma); 
-    //cout << "Set sigma_subvec... \n";
-    getSubVec(sigma_subvec_old, rank_old, snp_pos);
-
     cHyp_initial=cHyp_old;
-    gsl_vector_memcpy(sigma_subvec_new, sigma_subvec_old);
-    
     // Calculate likelihood with the top significant SNP
-    loglikegamma = CalcLikegamma(cHyp_old);
-    logPost_old = CalcPosterior_SS(D_old, mbeta_old, beta_old, cHyp_old, sigma_subvec_old, Error_Flag) + loglikegamma;
+    loglikegamma = CalcLikegamma(rank_old);
+    logPost_old = CalcPosterior_SS(D_old, mbeta_old, beta_old, cHyp_old, Error_Flag) + loglikegamma;
     if (Error_Flag) {
         cerr << "CalcPosterior_SS Failed at initialMCMC...\n";
         exit(-1);
@@ -3144,10 +2933,7 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
         for (size_t i=0; i<n_mh; ++i) {
             //cout << "\n \n propose gamam...\n";
             //cout << "old rank: "; PrintVector(rank_old);
-            //cout <<"XtX_old: "; PrintMatrix(XtX_old, rank_old.size(), rank_old.size());
-            //cout <<"Xty_old: "; PrintVector(Xty_old, rank_old.size());
             //cout <<"beta_old: "; PrintVector(beta_old, rank_old.size());
-
             //repeat = 1;
             cHyp_new = cHyp_old;
             rank_new = rank_old;
@@ -3157,9 +2943,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
             time_Proposal += (clock()-time_start)/(double(CLOCKS_PER_SEC)*60.0);
 
             //cout << "propose new rank: "; PrintVector(rank_new);
-            //cout <<"XtX_new: "; PrintMatrix(XtX_new, rank_new.size(), rank_new.size());
-            //cout <<"Xty_new: "; PrintVector(Xty_new, rank_new.size());
-
             //cout << "flag_gamma = " << flag_gamma << endl;
             //cout << "propose gamma success... with rank_new.size = " << rank_new.size() << endl;
             //cout << "propose gamma logMHratio = "<<logMHratio << "; MHratio = " << exp(logMHratio) << endl;
@@ -3172,19 +2955,13 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
                 else if(flag_gamma==2) ndel++;
                 else  nswitch++;
 
+                loglikegamma = CalcLikegamma(rank_new);
+                //   cout << "loglikegamma = " << loglikegamma << " in the non-Null model \n";
                 if (rank_new.size() > 0) {
-                    set_mgamma(cHyp_new, rank_new, snp_pos);
-                    getSubVec(sigma_subvec_new, rank_new, snp_pos);
-                    //cout << "sigma_subvec_new: "; PrintVector(sigma_subvec_new, rank_new.size());
-                    loglikegamma = CalcLikegamma(cHyp_new);
-                 //   cout << "loglikegamma = " << loglikegamma << " in the non-Null model \n";
-                    logPost_new = CalcPosterior_SS (D_new, mbeta_new, beta_new, cHyp_new, sigma_subvec_new, Error_Flag) + loglikegamma;
+                    logPost_new = CalcPosterior_SS (D_new, mbeta_new, beta_new, cHyp_new, Error_Flag) + loglikegamma;
                  //   cout << "Logpos of the newly proposed non-Null model is " << logPost_new << endl;
                 }
                 else{
-                    cHyp_new.m_gamma.assign(n_type, 0);
-                    loglikegamma = CalcLikegamma(cHyp_new);
-                    //cout << "loglikegamma = " << loglikegamma << " in the Null model \n";
                     logPost_new = loglikegamma;
                     cHyp_new.pve=0.0;
                     //cout << "Logpos of the null model is " << logPost_new << endl;
@@ -3215,7 +2992,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
                     logPost_old = logPost_new;
                     cHyp_old.pve = cHyp_new.pve;
                     cHyp_old.n_gamma = cHyp_new.n_gamma;
-                    cHyp_old.m_gamma = cHyp_new.m_gamma;
                     rank_old.clear();
                     for (size_t i=0; i<rank_new.size(); i++) {
                         rank_old.push_back(rank_new[i]); // copy rank_new to rank_old
@@ -3227,10 +3003,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
                 //cout << "Accept proposal: "; PrintVector(rank_old);
 
                 if(rank_old.size()>0){
-                    gsl_vector_view sigma_oldsub=gsl_vector_subvector(sigma_subvec_old, 0, rank_old.size());
-                    gsl_vector_view sigma_newsub=gsl_vector_subvector(sigma_subvec_new, 0, rank_old.size());
-                    gsl_vector_memcpy(&sigma_oldsub.vector, &sigma_newsub.vector);
-                
                     gsl_matrix_view Dold_sub=gsl_matrix_submatrix(D_old, 0, 0, rank_new.size(), rank_new.size());
                     gsl_vector_view mbeta_old_sub=gsl_vector_subvector(mbeta_old, 0, rank_new.size());
                     gsl_vector_view betaold_sub=gsl_vector_subvector(beta_old, 0, rank_new.size());
@@ -3252,7 +3024,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
              cout << "acceptance percentage = " << setprecision(6) << accept_percent << endl ;
              cout << "\n MCMC iteration after burn-ins = " << t - w_step << endl;
              cout << "From last mcmc: cHyp_old.n_gamma = " << cHyp_old.n_gamma << endl;
-             cout << "From last mcmc: # of selected variants per category = " << endl; PrintVector(cHyp_old.m_gamma);
              //cout << "beta_hat: "; PrintVector(beta_old, rank_old.size()); cout << endl;
              cout << "From last mcmc: posterior loglike = " << logPost_old << endl;
         }
@@ -3267,7 +3038,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
             if (cHyp_old.n_gamma > 0){
                 region_pip += 1.0; //count increase if the model has >0 SNPs
                 snps_mcmc_temp="";
-
                 for (size_t i=0; i<cHyp_old.n_gamma; ++i) {
                     // beta_g saved by position
                     pos=mapRank2pos[rank_old[i]];
@@ -3275,20 +3045,9 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
                     betai = gsl_vector_get(beta_old, i);
                     beta_g[pos].first += betai;
                     beta_g[pos].second += 1.0;
-                    //for (size_t j=0; j < n_type; j++) {
-                    //if (snp_pos[pos].indicator_func[j]) {
-                      //  sumbeta2[j] += betai * betai;
-                        //break;
-                    //    }
-                    //}
                     snps_mcmc_temp += string(snp_pos[pos].rs) + string(":") + string(snp_pos[pos].chr) + string(":") + to_string(snp_pos[pos].bp) + string(":") + to_string(snp_pos[pos].a_major) + string(":") + to_string(snp_pos[pos].a_minor)+ string(";");
                 }
                 snps_mcmc.push_back(snps_mcmc_temp);
-
-                //for (size_t j=0; j < ni_test; ++j){
-                //    if(cHyp_old.m_gamma[j] > 0)
-                //        em_gamma[j] += (double)cHyp_old.m_gamma[j];
-                //    }
                 k_save_sample++;
               }
             }
@@ -3301,7 +3060,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
 
     accept_percent = (double)n_accept/(double)(total_step * n_mh);
     cout << "Gamma Proposal Acceptance Percentage = " << accept_percent << endl ;
-    //cout << "Last iteration: # of selected variants per category: "; PrintVector(cHyp_old.m_gamma);
     //cout << "Last iteration beta_hat: "; PrintVector(beta_old, rank_old.size());
     //cout << "Last iteration Posterior loglike: " << logPost_old << endl;
     cout << "Accepted proposals: k_save_sample = " << k_save_sample << endl;
@@ -3336,196 +3094,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
     return;
 }
 // end of MCMC_SS version
-
-
-/*
-//InitialMCMC_SS with Summary Statistics
-void BVSRM::InitialMCMC_SS (const vector< vector<double> > &LD, const vector<double> &Xty, vector<size_t> &rank, class HYPBSLMM &cHyp, const vector<double> &pval, map<string, size_t> &mapScoreKey2Pos)
-
-{
-    //cout << "significant chisquare value : " << q_genome << endl;
-    cHyp.n_gamma=0;
-    for (size_t i=0; i<snp_pos.size(); ++i) {
-        if (pval[i] < 5e-8) {cHyp.n_gamma++;}
-    }
-
-    //cout << "number of included snps = " << cHyp.n_gamma << endl;
-    if (cHyp.n_gamma>s_max) {cHyp.n_gamma=s_max;}
-    if (cHyp.n_gamma<s_min) {cHyp.n_gamma=s_min;}
-    if (cHyp.n_gamma<1) {cHyp.n_gamma=1;} // Initialize with at least one variant
-
-
-    if (!iniSNPfile.empty() && iniType == 0) {
-
-        ifstream infile(iniSNPfile.c_str(), ifstream::in);
-        if(!infile) {cout << "Error opening file " << iniSNPfile << endl; exit(-1);}
-        string lineid;
-        rank.clear();
-        size_t rankj;
-
-        cout << "\nStart loading initial snp IDs from " << iniSNPfile << "\n";
-
-        while (!safeGetline(infile, lineid).eof()) {
-
-            for (size_t i=0; i < snp_pos.size(); i++) {
-                if (snp_pos[i].rs.compare(lineid) == 0) {
-                    // order i
-                    rankj = mapOrder2Rank[i] ;
-                    rank.push_back(rankj);
-                    //cout << lineid << " with rank = " << rankj;
-                    //snp_pos[orderj].printMarker();
-                    break;
-                }
-            }
-        }
-        infile.close();
-        infile.clear();
-
-        if (rank.size() == 0) {
-            for (size_t i=0; i<cHyp.n_gamma; ++i) {
-                rank.push_back(i);
-            }
-        } //take rank 0 if tracked no SNPs from the iniSNPfile
-    }
-    else if(iniType == 1 ) {
-        cout << "\nStart with top genome-wide significant variants.\n";
-        rank.clear();
-        for (size_t i=0; i<cHyp.n_gamma; ++i) {
-            rank.push_back(i);
-        }
-    }
-    else if( iniType == 3) {
-        cout << "\nStart with Step-wise selected variants.\n";
-        vector< pair<size_t, double> > rank_loglr;
-        size_t pos_r, pos_j, radd, s_size;
-        double xtx, rtr, yty_max;
-
-        double sig_lr = gsl_cdf_chisq_Qinv(5e-8, 1) ;
-        cout << "Genome-wide significant LRT is " << sig_lr << endl;
-
-        size_t topMarkers = 500;
-        //cout << "ns_test = " << ns_test << endl;
-        if(topMarkers > ns_test) topMarkers = ns_test;
-        //cout << "pos_ChisqTest size = " << pos_ChisqTest.size() << endl;
-
-        rank.clear();
-        rank.push_back(0);
-        //cout << "Initial rank size " << rank.size() << endl;
-
-        //excluded top SSNP
-        for(size_t i=1; i < topMarkers; i++){
-            rank_loglr.push_back( make_pair(i, pos_ChisqTest[i].second) );
-        } // rank_loglr: pair of rank and ChisqTest
-
-        //cout << "s_max = " << s_max << endl; 
-        gsl_matrix *XtX_cond=gsl_matrix_alloc (s_max, s_max);
-        gsl_vector *Xty_cond=gsl_vector_alloc (s_max);
-        gsl_vector *Xtx_cond=gsl_vector_alloc (s_max);
-        gsl_vector *beta_cond = gsl_vector_alloc (s_max);
-
-        for(size_t i = 1; i < s_max; i++)
-        {
-            s_size = rank.size();
-            SetSSgamma(LD, Xty, rank, XtX_cond, Xty_cond);
-            //cout << "SetSSgamma with rank  " << endl; PrintVector(rank);
-            //for(size_t l = 0; l < rank.size(); l++){
-            //    cout << "bp = " << snp_pos[ mapRank2pos[rank[l]] ].bp << ";" ;
-            //}
-            //cout << "\n XtX_cond : \n" ; PrintMatrix(XtX_cond, s_size, s_size);
-            //cout << "\n Xty_cond : \n"; PrintVector(Xty_cond, s_size);
-
-            gsl_matrix_const_view XtX_cond_temp = gsl_matrix_const_submatrix(XtX_cond, 0, 0, s_size, s_size);
-            gsl_vector_const_view Xty_cond_temp = gsl_vector_const_subvector(Xty_cond, 0, s_size);
-
-            // calculate beta-hat
-            gsl_vector_view beta_cond_temp = gsl_vector_subvector(beta_cond, 0, s_size);
-            CalcBeta(&XtX_cond_temp.matrix, &Xty_cond_temp.vector, &beta_cond_temp.vector);
-
-            // calculate conditioned residual variance
-            gsl_vector_const_view beta_cond_const = gsl_vector_const_subvector(beta_cond, 0, s_size);
-            yty_max = Findmaxyty(rank, s_size);
-            rtr = CalcResVar(&Xty_cond_temp.vector, &beta_cond_const.vector, yty_max);
-            // cout << "rtr = " << rtr << endl;
-
-            gsl_vector_view Xtx_cond_temp = gsl_vector_subvector(Xtx_cond, 0, s_size);
-            for(size_t j=0; j < rank_loglr.size(); j++){
-                pos_j = mapRank2pos[ rank_loglr[j].first ];
-                rank_loglr[j].second = CalcLR_cond_SS(rtr, pos_j, LD, Xty, rank, &beta_cond_const.vector, &Xtx_cond_temp.vector);
-            }
-            stable_sort(rank_loglr.begin(), rank_loglr.end(), comp_lr); //sort conditional LRT statistics
-            // cout << "Next top conditioned LRT is " << rank_loglr[0].second << endl;
-                
-            if(rank_loglr[0].second > sig_lr )
-            {
-                radd = rank_loglr[0].first;
-                pos_r = mapRank2pos[radd];
-                xtx = xtx_vec[pos_r];
-                SetXtx(LD, rank, pos_r, &Xtx_cond_temp.vector);
-
-                gsl_vector_const_view Xtx_cond_const = gsl_vector_const_subvector(Xtx_cond, 0, s_size);
-                if ( ColinearTest_SS(&XtX_cond_temp.matrix, &Xtx_cond_const.vector, &beta_cond_temp.vector, xtx) ) continue ;
-                else{
-                    rank.push_back(radd); // include rank r into initial model
-                    rank_loglr.erase(rank_loglr.begin());
-                }
-            }
-            else  {break;}
-        }
-        cout << "\n XtX_cond : \n" ; PrintMatrix(XtX_cond, s_size, s_size);
-        cout << "\n Xty_cond : \n"; PrintVector(Xty_cond, s_size);
-        gsl_matrix_free(XtX_cond);
-        gsl_vector_free(Xty_cond);
-        gsl_vector_free(Xtx_cond);
-        gsl_vector_free(beta_cond);
-    } 
-    else{
-        cout << "\nStart with the top leading variant.\n";
-        rank.clear();
-        rank.push_back(0);
-    } 
-    
-    cHyp.n_gamma = rank.size();
-    cout << "number of snps = " << cHyp.n_gamma << endl;
-    cout << "Initial model with ranks: \n"; PrintVector(rank);
-    
-    cHyp.logp=log((double)cHyp.n_gamma/(double)ns_test);
-    if (cHyp.logp==0) {cHyp.logp=-0.000001;}
-
-    cHyp.h = 0.1;
-    //cHyp.h=pve_null;
-    //if (cHyp.h==0) {cHyp.h=0.1;}
-   // cout<<"initial value of h = "<< h <<endl;
-    
-    cout << "trace_G = " << trace_G << endl;
-    double sigma_a2;
-    if (trace_G!=0) {
-        sigma_a2=cHyp.h*1.0/(trace_G*(1-cHyp.h)*exp(cHyp.logp));
-    } else {
-        sigma_a2=cHyp.h*1.0/( (1-cHyp.h)*exp(cHyp.logp)*(double)ns_test);
-    }
-    if (sigma_a2==0) {sigma_a2=0.025;}
-   // cout << "initial sigma_a2 = " << sigma_a2 << endl;
-    
-    //if (cHyp.h<h_min) {cHyp.h=h_min;}
-    //if (cHyp.h>h_max) {cHyp.h=h_max;}
-    if (cHyp.logp<logp_min) {cHyp.logp=logp_min;}
-    if (cHyp.logp>logp_max) {cHyp.logp=logp_max;}
-    
-    //cout << "start setHyp... \n";
-    setHyp(((double)cHyp.n_gamma/(double)ns_test), sigma_a2);
-    cHyp.theta = theta;
-    cHyp.log_theta = log_theta;
-    cHyp.subvar = subvar; // initial subvar vector
-    
-    //cout<<"initial value of h = "<< h <<endl;
-    //cout<<"initial value of rho = "<<cHyp.rho<<endl;
-    //cout<<"initial value of theta_vec = "; PrintVector(theta);
-    //qcout << "initial value of sub-variance_vec = "; PrintVector(subvar);
-    cout<<"Initially selected number of variants in the model = "<<cHyp.n_gamma<<endl;
-    
-    return;
-}
-*/
 
 // JY edit 06/15/2022
 //InitialMCMC_SS with Summary Statistics
@@ -3618,66 +3186,32 @@ void BVSRM::InitialMCMC_SS (const vector< vector<double> > &LD, vector<size_t> &
     cHyp.n_gamma = rank.size();
    // cout << "number of snps = " << cHyp.n_gamma << endl;
     cout << "Initial model with ranks: \n"; PrintVector(rank);
+    cout << endl << endl;
 
     cHyp.logp=log((double)cHyp.n_gamma/(double)ns_test);
     if (cHyp.logp==0) {cHyp.logp=-0.000001;}
-
     cHyp.h = 0.1;
-    //cHyp.h=pve_null;
-    //if (cHyp.h==0) {cHyp.h=0.1;}
-   // cout<<"initial value of h = "<< h <<endl;
-
-    // cout << "trace_G = " << trace_G << endl;
-    //Lei's note
-    double sigma_a2;
-    vector <double> atemp_old;
-    if (trace_G!=0) {
-        atemp_old = avector;
-    } else {
-        atemp_old.assign((Anum+1), 0);
-    }
-    vector <double> btemp_old;
-    if (trace_G!=0) {
-        btemp_old = bvector;
-    } else {
-        btemp_old.assign((Anum+1), 0);
-    }
-   // cout << "initial sigma_a2 = " << sigma_a2 << endl;
-
     //if (cHyp.h<h_min) {cHyp.h=h_min;}
     //if (cHyp.h>h_max) {cHyp.h=h_max;}
     if (cHyp.logp<logp_min) {cHyp.logp=logp_min;}
     if (cHyp.logp>logp_max) {cHyp.logp=logp_max;}
 
     //cout << "start setHyp... \n";
-    setHyp(atemp_old, btemp_old);
+    double tau_beta_temp = 0.1;
+    setHyp(tau_beta_temp);
 
-    cHyp.theta = theta;
-    cHyp.log_theta = log_theta;
-    cHyp.subvar = subvar; // initial subvar vector
-
-    //cout<<"initial value of h = "<< h <<endl;
-    //cout<<"initial value of rho = "<<cHyp.rho<<endl;
-    cout<<"Prior causal prabobility per category = "; PrintVector(theta);
-   // cout << "Prior value of sub-variance_vec = "; PrintVector(subvar);
-   // cout<<"Initially selected number of variants in the model = "<<cHyp.n_gamma<<endl;
+    cout<<"Prior causal prabobility per SNP = "; PrintVector(theta, 10);
+    // cout<<"Initially selected number of variants in the model = "<<cHyp.n_gamma<<endl;
     return;
 }
 
 // Calculate posterior likelihood with summary statistics
-double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gsl_vector *beta, class HYPBSLMM &cHyp, gsl_vector *sigma_vec, bool &Error_Flag)
+double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gsl_vector *beta, class HYPBSLMM &cHyp, bool &Error_Flag)
 {
     //conditioning on hyper parameters: subvar, log_theta
     double loglike=0.0;
     size_t s_size = cHyp.n_gamma;
     Error_Flag=0;
-
-    gsl_vector *sigma_subvec_inv = gsl_vector_alloc (s_size);
-    double logdet_V = 0.0;
-    for(size_t i=0; i < s_size; i++){
-        gsl_vector_set(sigma_subvec_inv, i, 1/gsl_vector_get(sigma_vec, i));
-        logdet_V = logdet_V + log(gsl_vector_get(sigma_vec, i));
-    }
     
     gsl_matrix_const_view D_sub=gsl_matrix_const_submatrix (D, 0, 0, s_size, s_size);
     gsl_vector_const_view mbeta_sub=gsl_vector_const_subvector (mbeta, 0, s_size);
@@ -3688,18 +3222,20 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
     // Calculate Sigma_beta = (Omega)^(-1)
     gsl_matrix_memcpy(Omega, &D_sub.matrix);
     gsl_vector_view Omega_diag = gsl_matrix_diagonal(Omega);
-    gsl_vector_add(&Omega_diag.vector, sigma_subvec_inv);
+    gsl_vector_add_constant(&Omega_diag.vector, tau_beta);
 
-    // posterior estimates of beta
+    // posterior estimates of beta_hat
     if(LapackSolve(Omega, &mbeta_sub.vector, beta_hat)!=0)
        EigenSolve(Omega, &mbeta_sub.vector, beta_hat);
     //cout << "beta_hat: "; PrintVector(beta_hat);
     gsl_vector_view beta_sub=gsl_vector_subvector(beta, 0, s_size);
     gsl_vector_memcpy(&beta_sub.vector, beta_hat);
+    double mbeta_t_betahat ;
+    gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &mbeta_t_betahat);
 
     // calculate logdet(Omega)
     double logdet_O = 0.0;
-    logdet_O=LapackLogDet(Omega);
+    logdet_O = LapackLogDet(Omega);
    // cout << "logdet_O = " << logdet_O << endl;
 
     // Start here 06/04/2022
@@ -3721,14 +3257,13 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
 
     double bSb;
     gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &bSb);
-    loglike = ni_test * bSb ;
-    loglike = -0.5 * (logdet_O + logdet_V - loglike); // log posterior likelihood
+    loglike = 0.5 * (double)s_size * log(tau_beta) ;
+    loglike = loglike + 0.5 * ( (double)ni_test * mbeta_t_betahat - logdet_O ); // log posterior likelihood
    // cout << "Posterior Loglike  = " << loglike << endl;
 
     gsl_matrix_free (Omega);
     gsl_vector_free (beta_hat);
     gsl_vector_free (D_beta_hat);
-    gsl_vector_free (sigma_subvec_inv);
 
     return loglike;
 }
@@ -3736,7 +3271,8 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
 bool BVSRM::CheckR2 (const vector<size_t> &rank, size_t ranki, const vector< vector<double> > &LD, const vector<double> &Xty, gsl_matrix *XtX_cond, gsl_vector *Xtx_cond, gsl_vector *Xty_cond, gsl_vector *beta_cond)
 {
     bool colinear = 0;
-    size_t s_size = rank.size(), pos_r, xtx;
+    size_t s_size = rank.size();
+    size_t pos_r;
     SetSSgamma(LD, Xty, rank, XtX_cond, Xty_cond);
     gsl_matrix_const_view XtX_cond_temp = gsl_matrix_const_submatrix(XtX_cond, 0, 0, s_size, s_size);
     gsl_vector_const_view Xty_cond_temp = gsl_vector_const_subvector(Xty_cond, 0, s_size);
@@ -3745,7 +3281,6 @@ bool BVSRM::CheckR2 (const vector<size_t> &rank, size_t ranki, const vector< vec
     CalcBeta(&XtX_cond_temp.matrix, &Xty_cond_temp.vector, &beta_cond_temp.vector);
 
     pos_r = mapRank2pos[ranki];
-    xtx = xtx_vec[pos_r];
     gsl_vector_view Xtx_cond_temp = gsl_vector_subvector(Xtx_cond, 0, s_size);
     SetXtx(LD, rank, pos_r, &Xtx_cond_temp.vector);
     gsl_vector_const_view Xtx_cond_const = gsl_vector_const_subvector(Xtx_cond, 0, s_size);

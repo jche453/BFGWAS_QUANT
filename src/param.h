@@ -1,6 +1,6 @@
 /*
-	Bayesian Functional GWAS --- MCMC (bfGWAS:MCMC)
-    Copyright (C) 2016  Jingjing Yang
+	Bayesian Functional GWAS --- MCMC (BFGWAS_QUANT:MCMC)
+    Copyright (C) 2022  Jingjing Yang
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -102,14 +102,10 @@ struct SNPPOS{
     string chr;
     long int bp;
     string a_minor;
-		string a_major;
-		double maf;
+	string a_major;
+	double maf;
     vector<double> annoscore;
     string key;
-		//double theta;
-		//double sigma2;
-    //vector<double> weight;
-    //double weight_i;
     void printMarker();
 };
 
@@ -162,45 +158,33 @@ public:
     double h;
     double rho;
     double logp;
-
-    vector<double> theta;
-    vector<double> log_theta; // log(theta) for each function type
-    vector<double> subvar; // variance for each function type
     vector<double> rho_vec;
-    vector<size_t> m_gamma; // # of selected SNP of each function type
-
     double rv;
-    double sigma_b2; //
+    double sigma_b2;
 	double pve;
 	double pge;
 	size_t n_gamma;
-
 };
 
 
 class PARAM {
 public:
-    //multiple functionrelated parameters
-    size_t n_type;
-    //vector<size_t> mFunc; // # of variants of each variant type
-		size_t Anum;
+	size_t n_type; // For BFGWAS_SS
+    vector<size_t> mFunc;
+	size_t Anum; // Number of annotations
     double e; //hyper parameter in the prior gamma distribution
     double vscale;
-    map<string, int> mapFunc2Code;
     int iniType;
     bool FIXHYP;
 
-    bool calc_K, saveGeno, saveSS, zipSS, inputSS, refLD, scaleN, printLD, use_xtx_LD;
+    bool calc_K, saveGeno, saveSS, zipSS, inputSS, refLD, scaleN, printLD;
     long int LDwindow;
 
     string iniSNPfile;
     string hypfile;
-    double rv, pheno_mean, pheno_var;
+    double pheno_mean, pheno_var;
 
 	// IO related parameters
-    size_t UnCompBufferSize;
-    vector <size_t> CompBuffSizeVec;
-    bool Compress_Flag;
     map<string, size_t>  PhenoID2Ind; // map sampleID to index in y (for reorder pheno with respect to geno)
     map<string, size_t>  PhenoID2Pos; // map sampleID to index in raw pheno (for obtaining pheno_index to be used with indicator_idv)
     map<string, size_t> GenoSampleID2Ind; // index sampleIDs with both pheno and geno data
@@ -208,7 +192,6 @@ public:
     vector<string> VcfSampleID; // size=total sample #
     vector<string> VcfSampleID_test; // sample id for ni_test in order of X[i][j]
     vector<string> InputSampleID; //size = ni_total
-    vector<pair<int, double> > UcharTable;
     vector<double> SNPmean;
 
     // SS related parameters
@@ -224,7 +207,6 @@ public:
 	int k_mode;				//kinship read mode: 1: n by n matrix, 2: id/id/k_value; 
 	size_t d_pace;		
 	
-    string file_func_code; //coded all unique variant function types
     string file_sample; // file containing analyzed sample IDs
     string file_vcf;
     string GTfield;
@@ -242,7 +224,7 @@ public:
 	double miss_level;
 	double maf_level;
 	double hwe_level;
-	double r2_level;
+	double r_level;
 
 	// BVSRM MCMC related parameters
     size_t win;
@@ -293,7 +275,6 @@ public:
 
 	map<string, size_t> mapScoreKey2Pos; //map snpkey to the position in score.txt
 	map<string, size_t> mapLDKey2Pos; // map snpkey to the position in LDR2.txt
-    map<int, string> mapCode2Func; // map unique code to a unique function type
 
 	map<string, int> mapID2num;		//map chr:pos:ref:alt to position, from 0 to n-1
 	map<string, string> mapRS2chr;		//map rs# to chromosome location

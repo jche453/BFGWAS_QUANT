@@ -24,11 +24,6 @@ void CALCSS::CopyFromParam (PARAM &cPar)
 {
 
     zipSS=cPar.zipSS;
-
-    UnCompBufferSize = cPar.UnCompBufferSize;
-    CompBuffSizeVec = cPar.CompBuffSizeVec;
-    Compress_Flag = cPar.Compress_Flag;
-
     file_out=cPar.file_out;
 
     ni_total=cPar.ni_total;
@@ -169,8 +164,8 @@ void CALCSS::WriteSS(const vector< vector<double> > &LD, const vector<double> &b
 
     IFILE cov_out=NULL;
     IFILE score_out=NULL;
-    if( (isnan(pheno_var) != 1) && (pheno_var != 0)) {
-        cout << "\nThe pheno variance != 0, writing z_score and LDcorr files. \n";
+    if( (isnan(pheno_var) != 1) && (pheno_var > 0)) {
+        cout << "\nThe pheno variance > 0, writing z_score and LDcorr files. \n";
         if(zipSS){
             cov_file_str +=".LDcorr.txt.gz";
             cov_out = ifopen(cov_file_str, "w", InputFile::BGZF);
