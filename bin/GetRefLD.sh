@@ -1,64 +1,132 @@
 #!/usr/bin/bash
 
-geno_dir=$1
-pheno=$2
-filehead=$3
-LDdir=$4
-Score_dir=$5
-LDwindow=$6
+#######################################################################
+### Input Arguments for Generate GWAS Summary Stat and LD Files
+#######################################################################
+# --wkdir: Working directory with writing access
+# --toolE: Emcmc executible file directory
+# --gene_dir: Directory for all genotype (VCF) files
+# --pheno : Path for phenotype file
+# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# --GTfield: Genotype data format: "GT" or "ES"
+# --filehead: Path for the text file of all file head names of genome block files
+# --LDdir: Directory to save all LD files
+# --Zscore_dir: Directory to save all GWAS summary score statistic files
+# --LDwindow: Window size to generate the LD correlation values
+# --maf: MAF threshold to exclude rare variants
+#######################################################################
 
-bfGWAS_SS_dir="/home/jchen/bfGWAS/bfGWAS_QuantitativeAnnotation"
-# geno_dir=/home/jyang/Collaborations/IrwinSAGE/BU_GWASs_CDSymptomDimensions/lddetect_Dosage_Files
+VARS=`getopt -o "" -a -l \
+wkdir:,toolE:,geno_dir:,pheno:,genofile_type:,GTfield:,filehead:,LDdir:,Zscore_dir:,LDwindow:,maf: \
+-- "$@"`
 
-line=$(head -n $SGE_TASK_ID $filehead | tail -n1)
-
-##### Set up temperary directory
-TMP_NAME=`/usr/bin/mktemp -u XXXXXXXX`
-# For array jobs, include the SGE task ID (in addition to the job ID):
-TEMPDIR="/scratch/${JOB_ID}_${SGE_TASK_ID}_${TMP_NAME}"
-
-if [ -e $TEMPDIR ]; then
-  echo "Error. temp dir already exists on `hostname`"
-  exit
-else
-   mkdir $TEMPDIR
+if [ $? != 0 ]
+then
+    echo "Terminating....." >&2
+    exit 1
 fi
 
-##### run BFGWAS
-cd ${TEMPDIR}
+eval set -- "$VARS"
 
-echo Run BFGWAS with genotype: ${geno_dir}/${line}.geno.gz
-echo And phenotype: ${pheno}
+while true
+do
+    case "$1" in
+	    --wkdir|-wkdir) wkdir=$2; shift 2;;
+        --toolE|-toolE) toolE=$2; shift 2;;
+        --geno_dir|-geno_dir) geno_dir=$2; shift 2;;
+        --pheno|-pheno) pheno=$2; shift 2;;
+        --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
+		--GTfield|-GTfield) GTfield=$2; shift 2;;
+        --filehead|-filehead) filehead=$2; shift 2;;
+        --LDdir|-LDdir) LDdir=$2; shift 2;;
+        --Zscore_dir|-Zscore_dir) Zscore_dir=$2; shift 2;;
+        --LDwindow|-LDwindow) LDwindow=$2; shift 2;;
+        --maf|-maf) maf=$2; shift 2;;
+        --) shift;break;;
+        *) echo "Internal error!";exit 1;;
+        esac
+done
 
-if [ -f ${LDdir}/${line}.LDcorr.txt.gz ] ; then
-	echo ${LDdir}/${line}.LDcorr.txt.gz exists!
-	LDwindow=1
+#### default value
+LDwindow=${LDwindow:-1000000} # 1000KB
+LDwindow_i=${LDwindow}
+maf=${maf:-0.001}
+genofile_type=${genofile_type:-vcf}
+GTfield=${GTfield:-GT}
+
+#### Create output directory for LD and Score summary stat files if not existed
+mkdir -p $wkdir
+cd $wkdir
+mkdir -p ${LDdir}
+mkdir -p ${Score_dir}
+
+####################
+
+##### run ./BFGWAS/bin/Estep_mcmc to generate GWAS summary score statistic and LD files
+echo Generate GWAS summary Zscore statistic and LD correlation files with genome blocks under: ${geno_dir}
+echo Genotype file type: $genofile_type
+echo Phenotype: ${pheno}
+echo Genetic variants with MAF greater than ${maf}
+echo Under working directory: $wkdir
+echo Input LDwidnow: ${LDwindow}
+
+if [ ! -s ${pheno} ] ; then
+	echo Phenotype file $pheno dose not exist or is empty. Please provide a phenotype file.
+	exit 1
 fi
 
-echo LDwindow is $LDwindow
+cat ${filehead} | while read line ; do
+	echo Genome block: $line
+	LDwindow_i=${LDwindow}
 
-### With input genotype file in dosage format
-${bfGWAS_SS_dir}/bin/Estep_mcmc -vcf ${geno_dir}/${line}.vcf.gz -p ${pheno} -maf 0 -o ${line} -LDwindow ${LDwindow} -saveSS -zipSS
+	# Set LDwindow = 1 if LD file exit; Exit this script if Score statistic file exist
+	if [ -s ${LDdir}/${line}.LDcorr.txt.gz ] ; then
+		echo ${LDdir}/${line}.LDcorr.txt.gz exists!
+		LDwindow_i=1
+		if [ -s ${Zscore_dir}/${line}.Zscore.txt.gz ] ; then
+			echo ${Zscore_dir}/${line}.Zscore.txt.gz exists.
+			continue
+		fi
+	fi
 
-### With input genotype file in VCF format
-# ${bfGWAS_SS_dir}/bin/Estep_mcmc -vcf ${geno_dir}/${line}.vcf.gz -p ${pheno} -maf 0 -o ${line} -LDwindow ${LDwindow} -saveSS -zipSS
+	if [ "${genofile_type}" == "vcf" ] ; then
+		if [ -s ${geno_dir}/${line}.vcf.gz ] ; then
+			echo Genotype field: $GTfield
+			echo LDwidnow: ${LDwindow_i}
+			### With input genotype file in VCF format
+			${toolE} -vcf ${geno_dir}/${line}.vcf.gz -p ${pheno} -maf ${maf} -GTfield ${GTfield} \
+					-o ${line} -LDwindow ${LDwindow_i} -saveSS -zipSS
+		else
+			echo Genotype block file ${geno_dir}/${line}.vcf.gz dose not exist or is empty. Please check.
+			exit 1
+		fi
+	elif [ "${genofile_type}" == "geno" ] ; then
+			if [ -s ${geno_dir}/${line}.geno.gz ] ; then
+				echo LDwidnow: ${LDwindow_i}
+				### With input genotype file in dosage format
+				${toolE} -g ${geno_dir}/${line}.geno.gz -p ${pheno} -maf ${maf} \
+						-o ${line} -LDwindow ${LDwindow_i} -saveSS -zipSS
+			else
+				echo Genotype block file ${geno_dir}/${line}.geno.gz dose not exist or is empty. Please check.
+				exit 1
+			fi
+	else
+		echo Please specify \'--genofile_type vcf\' or \'--genofile_type geno\' ...
+		exit 1
+	fi
 
-echo Run BFGWAS Successfully to generate summary statistics!
+	echo Successfully generate GWAS summary score statistic and LD files for genome block $line.
 
 ##### Copy summary stat back
-if [ ! -f ${LDdir}/${line}.LDcorr.txt.gz ] ; then
-	echo Copy log.txt and LDcorr.txt.gz back to $LDdir
-	cp -f  ${TEMPDIR}/output/${line}.LDcorr.txt.gz ${LDdir}/
-	cp -f  ${TEMPDIR}/output/${line}.log.txt ${LDdir}/
-else
-	echo Copy log.txt back to $Score_dir
-	cp -f  ${TEMPDIR}/output/${line}.log.txt ${Score_dir}/
-fi
+	rsync  ./output/${line}.LDcorr.txt.gz* ${LDdir}/
+	rsync  ./output/${line}.Zscore.txt.gz* ${Zscore_dir}/
 
-echo Copy score.txt back $Score_dir
-cp -f  ${TEMPDIR}/output/${line}.score.txt.gz ${Score_dir}/
+	## Remove temperary output directory
+	rm -f ./output/${line}*
+
+done
+
+exit 0
 
 
-rm -rf ${TEMPDIR}
 
-exit
