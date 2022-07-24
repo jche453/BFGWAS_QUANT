@@ -1017,12 +1017,12 @@ void BVSRM::setHyp(double tau_beta_temp)
     // cout << "sum_theta: " << sum_theta << endl;
 
     // scale prior causal probability
-    /*if ( ((double)(snp_pos.size()) / 1000000.0) < sum_theta) {
+    if ( ((double)(snp_pos.size()) / 1000000.0) < sum_theta) {
       // cout << "Scale prior CPP to 1e-6 per SNP ... \n";
       for (size_t i=0; i < snp_pos.size(); ++i){
         theta[i] = (theta[i] / sum_theta) * ((double)(snp_pos.size()) / 1000000.0);
       }
-    }*/
+    }
 
     log_theta.clear();
     log_qtheta.clear();
