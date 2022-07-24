@@ -33,19 +33,16 @@ Options:
   --Zscore_dir    directory of GWAS single variant Zscore statistic files
   --filehead         text file with a list of fileheads for genome blocks
   --anno_dir       annotation file directory
-  --anno_code       annotation classification code file
+  --AnnoNumber  number of annotations
   --hfile      initial hyper parameter value file
-  --pv       phenotype variance
   --Nsample       sample size
   --maf      maf threshold: default 0.5% 
   --Nburnin         number of burn ins: default 10,000
   --Nmcmc         number of MCMC iterations: default 10,000
   --NmcmcLast       number of MCMC iterations for the last EM iteration: default 50,000
-  --pp       specify prior for the causal probability: default 1e-6
-  --a_gamma  specify shape parameter in the inverse gamma prior for the effect size variance: default 0.1
-  --b_gamma  specify scale parameter in the inverse gamma prior for the effect size variance: default 0.1
+  --a_gamma  specify shape parameter in the prior gamma distirubtion of the effect size precision: default 1.0001
+  --b_gamma  specify rate parameter in the prior gamma distirubtion of the effect size precision: default 1
   --win      window size of the neighborhood: default 100
-  -c         compress genotype data (1) or not (0): default 0 (do not compress)
   --initype  specify initial model (1:start with top signal), (2: start with genome-wide significant signals), or default (3: stepwise selected signals)
   --smin     minimum number of variates per block in the model: default 0
   --smax     maximum number of variates per block in the model: default 5
@@ -74,7 +71,6 @@ my $filehead = "";
 my $Zscore_dir = "";
 my $LDdir="";
 my $anno_dir="";
-my $annoCode="";
 my $hfile="";
 my $Nsample="1000";
 
@@ -86,9 +82,9 @@ my $win="100";
 my $burnin="10000";
 my $Nmcmc="10000";
 my $NmcmcLast="10000";
-my $pp="1e-6";
 my $a_gamma="1.0001"; # mode 0.0001; mean 1 in the gamma distribution
 my $b_gamma="1";
+my $AnnoNumber="1";
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -97,10 +93,10 @@ if(!GetOptions ('h'=>\$help, 'v'=>\$verbose, 'd'=>\$debug, 'm'=>\$man,
                 'wkdir:s'=>\$wkdir, 'tool_dir:s' =>\$tool_dir, 
                 'LDdir:s'=>\$LDdir, 'Zscore_dir:s'=>\$Zscore_dir,
                 'filehead:s'=>\$filehead, 'anno_dir:s'=>\$anno_dir, 
-                'anno_code:s'=>\$annoCode, 'hfile:s'=>\$hfile, 
-                'maf:s'=>\$maf, 'Nsample:s'=>\$Nsample,
+                'AnnoNumber:s'=>\$AnnoNumber,
+                'hfile:s'=>\$hfile, 'maf:s'=>\$maf, 'Nsample:s'=>\$Nsample,
                 'Nburnin:s'=>\$burnin, 'Nmcmc:s'=>\$Nmcmc, 'NmcmcLast:s'=>\$NmcmcLast,
-                'pp:s'=>\$pp, 'a_gamma:s'=>\$a_gamma, 'b_gamma:s'=>\$b_gamma,
+                'a_gamma:s'=>\$a_gamma, 'b_gamma:s'=>\$b_gamma,
                 'win:s'=>\$win, 'smin:s'=>\$smin, 'smax:s'=>\$smax,
                 'em:i'=>\$EM, 'mf:s'=>\$makeFile)
   || !defined($wkdir) || scalar(@ARGV)!=0)
@@ -142,12 +138,12 @@ printf("launch method : %s\n", $launchMethod);
 printf("work directory : %s\n", $wkdir);
 print "Estep: ", $toolE, "\n", "Rscript: ", $rs, "\n"; 
 print "Zscore_dir: ", $Zscore_dir, "\n", "LDdir: ", $LDdir, "\n",
-        "anno_dir: ", $anno_dir, "\nannoCode: ", $annoCode, "\n", 
+        "anno_dir: ", $anno_dir, "; AnnoNumber: ", $AnnoNumber,  "\n",
         "hfile: ", $hfile, "\nfilehead text file: ", $filehead, "\n",
         "Nsample ", $Nsample, "; maf ", $maf, "; smin ", $smin, "\n",
         "smax ", $smax, "; win ", $win, "\n", 
         "burnin ", $burnin, "; Nmcmc ", $Nmcmc, "; NmcmcLast ", $NmcmcLast, "\n",
-        "; pp ", $pp, "; a_gamma ", $a_gamma, "; b_gamma ", $b_gamma,"\n";
+        "; a_gamma ", $a_gamma, "; b_gamma ", $b_gamma,"\n";
 printf("\n");
 
 
@@ -208,7 +204,7 @@ for(my $j=0; $j< @filehead; ++$j)
         $tgt = "$wkdir/OUT/$line.$i.OK";
         $dep = "$wkdir/pre_em.OK";
 
-        @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -fcode ${annoCode} -hfile ${hypcurrent} -maf ${maf} -n $Nsample -bvsrm -smin $smin -smax $smax -win $win -o ${line} -w ${burnin} -s ${Nmcmc} -seed 2022 > ${wkdir}/OUT/${line}.output.txt";
+        @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -hfile ${hypcurrent} -maf ${maf} -n ${Nsample} -bvsrm -smin ${smin} -smax ${smax} -win $win -o ${line} -w ${burnin} -s ${Nmcmc} -AnnoNumber ${AnnoNumber} -seed 2022 > ${wkdir}/OUT/${line}.output.txt";
         makeJob($tgt, $dep, @cmd);
     }
 
@@ -227,7 +223,7 @@ makeJob($tgt, $dep, @cmd);
 
 $tgt = "$wkdir/R$i.OK";
 $dep = "$wkdir/Eoutput/cp_param$i.OK $wkdir/pre_em.OK";
-@cmd = "Rscript --vanilla ${rs} $hypfile $i $pp $a_gamma $b_gamma $Nsample $wkdir/Eoutput/EM_result.txt $hypcurrent >> $wkdir/Rout.txt";
+@cmd = "Rscript --vanilla ${rs} $hypfile $i $a_gamma $b_gamma $Nsample $hypcurrent $paramfile $wkdir/Eoutput/EM_result.txt >> $wkdir/Rout.txt";
 makeJob($tgt, $dep, @cmd);
 
 
@@ -244,9 +240,9 @@ for $i (1..$EM){
         $tgt = "$wkdir/OUT/$line.$i.OK";
         $dep = "$wkdir/R$ipre.OK";
         if($i < $EM){
-          @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -fcode ${annoCode} -hfile ${hypcurrent} -n $Nsample -maf ${maf} -bvsrm -smin $smin -smax $smax -win $win -o ${line} -w ${burnin} -s ${Nmcmc} -seed 2022 > ${wkdir}/OUT/${line}.output.txt" ;
+          @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -hfile ${hypcurrent} -n $Nsample -maf ${maf} -bvsrm -smin $smin -smax $smax -win $win -o ${line} -w ${burnin} -s ${Nmcmc} -AnnoNumber ${AnnoNumber} -seed 2022 > ${wkdir}/OUT/${line}.output.txt" ;
         } elsif ($i == $EM){
-            @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -fcode ${annoCode} -hfile ${hypcurrent} -n $Nsample -maf ${maf} -bvsrm -smin $smin -smax $smax -win $win -o ${line} -w ${burnin} -s ${NmcmcLast} -seed 2022 > ${wkdir}/OUT/${line}.output.txt";
+            @cmd = "$toolE -inputSS -Zscore ${Zscore_dir}/${line}.Zscore.txt.gz -LDcorr ${LDdir}/${line}.LDcorr.txt.gz -a ${anno_dir}/Anno_${line}.txt.gz -hfile ${hypcurrent} -n $Nsample -maf ${maf} -bvsrm -smin $smin -smax $smax -win $win -o ${line} -w ${burnin} -s ${NmcmcLast} -AnnoNumber ${AnnoNumber} -seed 2022 > ${wkdir}/OUT/${line}.output.txt";
       }
         makeJob($tgt, $dep, @cmd);
     }
@@ -266,7 +262,7 @@ for $i (1..$EM){
 
   $tgt = "$wkdir/R$i.OK";
   $dep = "$wkdir/Eoutput/cp_param$i.OK";
-  @cmd = "Rscript --vanilla $rs $hypfile $i $pp $a_gamma $b_gamma $Nsample $wkdir/Eoutput/EM_result.txt $hypcurrent >> $wkdir/Rout.txt";
+  @cmd = "Rscript --vanilla $rs $hypfile $i $a_gamma $b_gamma $Nsample $hypcurrent $paramfile $wkdir/Eoutput/EM_result.txt >> $wkdir/Rout.txt";
   makeJob($tgt, $dep, @cmd);
 
 }

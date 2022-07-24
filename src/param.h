@@ -171,7 +171,6 @@ class PARAM {
 public:
 	size_t n_type; // For BFGWAS_SS
     vector<size_t> mFunc;
-	size_t Anum; // Number of annotations
     double e; //hyper parameter in the prior gamma distribution
     double vscale;
     int iniType;
@@ -252,6 +251,8 @@ public:
     
 	size_t ns_total, ns_test;	//number of snps
 	size_t n_cvt;
+
+	size_t Anum; // Number of annotations
 
 	size_t ng_total, ng_test;	//number of genes
 	size_t ni_control, ni_case;	//number of controls and number of cases

@@ -35,7 +35,7 @@ done
 cd $wkdir
 
 echo Run make clean
-make -f ${mkfile} clean
+# make -f ${mkfile} clean
 
 echo Run makefile $mkfile with $njob parallel jobs
 

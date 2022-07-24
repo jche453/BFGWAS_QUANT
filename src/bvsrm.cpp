@@ -932,7 +932,7 @@ void BVSRM::setHyp(double tau_beta_temp)
     //cout << "Anum = " << Anum <<endl;
     tau = 1.0 ;
     avector.assign((Anum+1), 0.0);
-    avector[0] = -10.0;
+    avector[0] = -12.0;
     tau_beta = tau_beta_temp;
 
     //cout << "load fixed parameter a & b vector from : " << hypfile << endl;
@@ -987,8 +987,8 @@ void BVSRM::setHyp(double tau_beta_temp)
 
     theta.clear();
     // setup theta vector from enrichment coefficient avector
-    cout << "snp_pos.size() = " << snp_pos.size() << endl;
-    cout << "ns_test = " << ns_test << endl;
+    //cout << "snp_pos.size() = " << snp_pos.size() << endl;
+    //cout << "ns_test = " << ns_test << endl;
     for (size_t i=0; i < snp_pos.size(); ++i){
         theta_value = avector[0];
         if(snp_pos[i].annoscore.size() > 0){
@@ -1001,28 +1001,28 @@ void BVSRM::setHyp(double tau_beta_temp)
         }
         theta_value = exp(theta_value) / (1.0 + exp(theta_value));
         theta.push_back(theta_value);
-        if(i < 10){
+        /*if(i < 10){
             cout << snp_pos[i].key << endl;
             cout << "snp_pos[i].annoscore : " ;
             PrintVector(snp_pos[i].annoscore);
             cout << "Prior CPP theta = " << theta[i] << endl;
-        }
+        }*/
     }
 
     sum_theta = 0.0 ;
-    cout << "\n theta.size() = " << theta.size() << endl;
+    // cout << "\n theta.size() = " << theta.size() << endl;
     for (size_t i=0; i < theta.size(); ++i){
         sum_theta = sum_theta + theta[i];
     }
-    cout << "sum_theta: " << sum_theta << endl;
+    // cout << "sum_theta: " << sum_theta << endl;
 
     // scale prior causal probability
-    if ( ((double)(snp_pos.size()) / 1000000.0) < sum_theta) {
-      cout << "Scale prior CPP to 1e-6 per SNP ... \n";
+    /*if ( ((double)(snp_pos.size()) / 1000000.0) < sum_theta) {
+      // cout << "Scale prior CPP to 1e-6 per SNP ... \n";
       for (size_t i=0; i < snp_pos.size(); ++i){
         theta[i] = (theta[i] / sum_theta) * ((double)(snp_pos.size()) / 1000000.0);
       }
-    }
+    }*/
 
     log_theta.clear();
     log_qtheta.clear();
@@ -1032,7 +1032,7 @@ void BVSRM::setHyp(double tau_beta_temp)
         log_qtheta.push_back(log(1.0 - theta[i]));
         sum_logqtheta += log_qtheta[i] ;
     }
-    cout << "sum of log( 1 - CPP ) of all SNPs : " << sum_logqtheta << endl;
+   // cout << "sum of log( 1 - CPP ) of all SNPs : " << sum_logqtheta << endl;
 }
 
 
@@ -2948,7 +2948,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
             //cout << "propose gamma logMHratio = "<<logMHratio << "; MHratio = " << exp(logMHratio) << endl;
 
             accept = 0;
-            time_start = clock_t(); //record time on calculating posterior
             if (flag_gamma > 0) {
 
                 if(flag_gamma==1) nadd++;
@@ -3200,7 +3199,7 @@ void BVSRM::InitialMCMC_SS (const vector< vector<double> > &LD, vector<size_t> &
     double tau_beta_temp = 0.1;
     setHyp(tau_beta_temp);
 
-    cout<<"Prior causal prabobility per SNP = "; PrintVector(theta, 10);
+    // cout<<"Prior causal prabobility per SNP = "; PrintVector(theta, 10);
     // cout<<"Initially selected number of variants in the model = "<<cHyp.n_gamma<<endl;
     return;
 }

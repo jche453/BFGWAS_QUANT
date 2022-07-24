@@ -71,17 +71,24 @@ a_gr <- function(a) {
 
 a_Hess <- function(a) {
   a_num = length(a)
-  exp_mAta = exp(-A_temp %*% a)
+  exp_Ata = exp(A_temp %*% a)
   a_Hess_sum = matrix(0, a_num, a_num)
   for (i in 1:nrow(A_temp)) {
-    a_Hess_sum = a_Hess_sum + (exp_mAta[i] / ((1 + exp_mAta[i])^2) ) * outer(A_temp[i,], A_temp[i,])
+    a_Hess_value = as.numeric( 1 / ( 2 + exp_Ata[i] + (1/exp_Ata[i]) ) )  * outer(A_temp[i,], A_temp[i,])
+    a_Hess_sum = a_Hess_sum + a_Hess_value
   }
   a_Hess_sum = a_Hess_sum + diag(rep(1, a_num))
   return( as.matrix(a_Hess_sum))
 }
 
-a_temp = optimx(avec_old, fn = a_fn, method='L-BFGS-B', gr = a_gr, hess = a_Hess,
-                upper = c(avec_old[1], rep(10, Anum)), lower = c(avec_old[1], rep(-10, Anum)) ) [1:length(avec_old)]
+a_temp = optimx(avec_old, fn = a_fn, method='L-BFGS-B', gr = a_gr,
+               # hess = a_Hess,
+               hessian = TRUE,
+              upper = c(-10, rep(10, Anum)), lower = c(-14, rep(-10, Anum)) )
+print("Solve for a_vector: ")
+print(a_temp)
+
+a_temp = a_temp[1:length(avec_old)]
 
 ####################################################
 # gwas_n = 2453; a_gamma = 1.01; b_gamma = 1

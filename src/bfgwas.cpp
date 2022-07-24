@@ -43,7 +43,7 @@ using namespace std;
 
 
 BFGWAS::BFGWAS(void):	
-version("BFGWAS_SS_MCMC"), date("07/20/2022"), year("2022")
+version("BFGWAS_QUANT"), date("07/20/2022"), year("2022")
 {}
 
 void BFGWAS::PrintHeader (void)
@@ -394,7 +394,7 @@ void BFGWAS::Assign(int argc, char ** argv, PARAM &cPar)
 				++i;
 				str.clear();
 				str.assign(argv[i]);
-				cPar.Anum=atof(str.c_str()); // read number of annotation
+				cPar.Anum=atoi(str.c_str()); // read number of annotation
 		}
 		else if (strcmp(argv[i], "-r")==0) {
 			if(argv[i+1] == NULL || argv[i+1][0] == '-') {continue;}
@@ -954,19 +954,17 @@ void BFGWAS::WriteLog (int argc, char ** argv, PARAM &cPar)
 	}
 
 	outfile<<"##"<<endl;
-	outfile<<"## Computation Time:"<<endl;
-	outfile<<"## total computation time = "<<cPar.time_total<<" min "<<endl;
-	outfile<<"## computation time break down: "<<endl;
-
-
+	//outfile<<"## Computation Time:"<<endl;
+	outfile<<"## Total computation time = "<<cPar.time_total<<" min "<<endl;
+//	outfile<<"## computation time break down: "<<endl;
 	if (cPar.a_mode==11) {
-		outfile<<"##      time on MCMC = "<<cPar.time_opt<<" min "<<endl;
-		outfile<<"##      time on Proposal = "<<cPar.time_Proposal<<" min "<<endl;
-		outfile<<"##      time on Posterior = "<<cPar.time_Omega<<" min "<<endl;
+	//	outfile<<"##      time on MCMC = "<<cPar.time_opt<<" min "<<endl;
+	//	outfile<<"##      time on Proposal = "<<cPar.time_Proposal<<" min "<<endl;
+	//	outfile<<"##      time on Posterior = "<<cPar.time_Omega<<" min "<<endl;
 
-        outfile << "Accept #add=" << cPar.nadd_accept<< ", total add step = " << cPar.nadd<<endl;
-        outfile << "Accept #delete=" << cPar.ndel_accept<< ", total delete step = " << cPar.ndel<<endl;
-        outfile << "Accept #switch=" << cPar.nswitch_accept<< ", total switch step = " << cPar.nswitch<<endl;
+        outfile << "## Accept add iterations =" << cPar.nadd_accept<< ", total add step = " << cPar.nadd<<endl;
+        outfile << "## Accept delete iterations =" << cPar.ndel_accept<< ", total delete step = " << cPar.ndel<<endl;
+        outfile << "## Accept switch iterations =" << cPar.nswitch_accept<< ", total switch step = " << cPar.nswitch<<endl;
         //outfile << "Accept #other=" << cPar.nother_accept<< ", total other step = " << cPar.nother<<endl;
 	}
 

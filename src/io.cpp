@@ -144,6 +144,7 @@ bool ReadFile_anno (const string &file_anno, vector<SNPINFO> &snpInfo, map<strin
 
     // Load annotation file...
     cout<<"Reading annotation file: "<<file_anno<<endl;
+    cout << "Number of annotation scores = " << Anum << endl;
     igzstream infile (file_anno.c_str(), igzstream::in);
     if (!infile) {cout<<"error opening annotation file: "<<file_anno<<endl; return false;}
 
@@ -161,8 +162,6 @@ bool ReadFile_anno (const string &file_anno, vector<SNPINFO> &snpInfo, map<strin
             continue;
         }
         else {
-
-
             pch=(char *)line.c_str();
             nch = strchr(pch, '\t');
             chr.assign(pch, nch-pch); // chr
@@ -239,12 +238,8 @@ bool ReadFile_anno (const string &file_anno, vector<SNPINFO> &snpInfo, map<strin
             }
         }
     }
-    cout << "Number of annotation scores = " << Anum << endl;
-
-
     infile.close();
     infile.clear();
-
     return true;
 }
 

@@ -105,9 +105,9 @@ h_min(-1), h_max(1.0), h_scale(-1),
 rho_min(1.0), rho_max(1.0),	rho_scale(-1),
 logp_min(0.0), logp_max(0.0), logp_scale(-1),
 s_min(0), s_max(10), 
-w_step(10000),	s_step(100000), n_accept(0),
+w_step(10000),	s_step(10000), n_accept(0),
 n_mh(10), randseed(2022), error(false), ni_test(0),
-time_total(0.0), time_G(0.0), time_Omega(0.0)
+Anum(1), time_total(0.0), time_G(0.0), time_Omega(0.0)
 {}
 
 
@@ -205,7 +205,8 @@ void PARAM::ReadFiles (void)
          	error=true;}
 	    }
 	    else{
-	    	cout << "\nEmpty annotation file, all variants are treated as of one category!\n";
+	    	Anum = 1;
+	    	cout << "\nEmpty annotation file, all variants are set to have one annotation with all 0s!\n";
 	    	if (Empty_anno (indicator_snp, snpInfo, Anum)==false) {error=true;}
 	    }
 
@@ -289,6 +290,11 @@ void PARAM::CheckParam (void)
 		error = true ;
 	}
 
+	if( Anum < 1 ){
+		cout << "The number of annotations need to be >= 1. Default value is 1. \n";
+		error = true ;
+	}
+
 	return;
 }
 
@@ -364,10 +370,15 @@ void PARAM::CheckData (void) {
 		if (h_min==-1) {h_min=0.00000001;}
 		if (h_max==-1) {h_max=1.0;}
 		
-		if (s_max>ns_test) {s_max=ns_test; cout<<"s_max is re-set to the number of analyzed SNPs."<<endl;}
-		if (s_max<s_min) {cout<<"error! maximum s value must be larger than the minimal value. current values = "<<s_max<<" and "<<s_min<<endl; error=true;}
+		if (s_max>ns_test) {
+			s_max=ns_test;
+			cout<<"s_max is re-set to the number of analyzed SNPs."<<endl;
+		}
+		if (s_max<s_min) {
+			cout<<"error! maximum s value must be larger than the minimal value. current values = "<<s_max<<" and "<<s_min<<endl;
+			error=true;
+		}
 	}
-
 	return;
 }
 
@@ -430,6 +441,8 @@ void PARAM::ReadSS (){
 		      if (ReadFile_anno (file_anno, mapScoreKey2Pos, snp_pos, Anum)==false)
 		        	{error=true;}
 		    }else{
+		    	Anum = 1;
+		    	cout << "\nEmpty annotation file, all variants are set to have one annotation with all 0s!\n";
 		      if (Empty_anno (snp_pos, Anum)==false)
 		    	   {error=true;}
 		    }
