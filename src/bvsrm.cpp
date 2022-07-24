@@ -2677,20 +2677,13 @@ double BVSRM::CalcLR_cond_SS(const double &rtr, const size_t pos_j, const vector
 
     gsl_blas_ddot(Xtx_j, beta_cond, &Xtxb_j);
     xtr_j = mbeta[pos_j] - Xtxb_j; // conditional genetic effect
-
-    // cout << "rtr = " << rtr << "; xtr_j = " << xtr_j << endl;
     lrt = rtr - xtr_j * xtr_j ; // residual r2 in the conditional model
-
     if( lrt <= 0)
     {
-        //cout << "pos_j = " << pos_j << "; lrt = " << lrt << endl;
-        //cout << "rtr = " << rtr << "; xtr_j = " << xtr_j << "; xtx_j = " << xtx_j << endl;
-        perror("Nonpositive regression var in CalcLR_cond_SS(), MCMC results may not be reliable !!\n Please double check your input summary statistics!\n");
+        // cout << "rtr = " << rtr << "; xtr_j = " << xtr_j << "; lrt = " << lrt << endl;
+        lrt = 0.0000001;
     }
-    else{
-        lrt = (double)(ni_test) * (log(rtr) - log(lrt) ); // Likelihood Ratio Test Statistic
-    }
-
+    lrt = (double)(ni_test) * (log(rtr) - log(lrt) ); // Likelihood Ratio Test Statistic
     return lrt;
 }
 
@@ -3244,15 +3237,13 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
     gsl_blas_ddot (D_beta_hat, beta_hat, &R2);
    // cout << "Regression R2 in CalcPosterior = " << R2 << endl;
      
-    if (R2 > 1 || R2 < 0.0) {
-        cerr << "Out of range regression R2 in CalcPosterior_SS: " << R2 << endl;
-        cerr << "MCMC results may not be reliable, please double check your input summary statistics!\n";
-        //Error_Flag=1;
+    if (R2 > 1.0 ) {
+        R2 = 1.0;
+    }else if(R2 < 0.0){
+        R2 = 0.0;
     }
-    else{
-        Error_Flag=0;
-        cHyp.pve = R2; // Calculate pve
-    }
+    Error_Flag=0;
+    cHyp.pve = R2; // Calculate pve
 
     double bSb;
     gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &bSb);

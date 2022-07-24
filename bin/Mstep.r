@@ -1,6 +1,7 @@
 library(optimx)
 Sys.setlocale('LC_ALL', 'C')
 options(stringsAsFactors=F)
+options(warn=-1)
 
 # Package names
 packages <- c("data.table", "tidyverse", "optimx")
@@ -140,7 +141,7 @@ if(k==0){
   write.table(data.frame(EM_iteration = k, R2 = R2, Loglike = loglike,
                         tau_beta = tau_beta_temp[1], avec = paste(a_temp, collapse = ",")),
               file = EM_result_file,
-              sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE, append=TRUE)
+              sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE, append=TRUE)
 }
 
 print("EM step time cost (in minutes) : ")

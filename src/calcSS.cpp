@@ -338,9 +338,10 @@ double CalcResVar(const gsl_matrix *D_cond, const gsl_vector * beta_cond)
     gsl_blas_dgemv(CblasNoTrans, 1, D_cond, beta_cond, 0, D_beta);
     double R2;
     gsl_blas_ddot (D_beta, beta_cond, &R2);
-    if( (R2 > 1.0)  || (R2 < 0.0) ){
-        cout << "Regression R2 in calcResVar = " << R2 << endl;
-        perror("Regression R2 fall out of the domain of [0, 1] ... !\n");
+    if( R2 > 1.0){
+        R2 = 1.0 ;
+    }else if(R2 < 0.0){
+        R2 = 0.0 ;
     }
     return (1.0 - R2);
 }
