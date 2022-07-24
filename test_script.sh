@@ -20,13 +20,6 @@ Zscore_dir=${BFGWAS_dir}/Example/ExData/Zscore
 LDdir=${BFGWAS_dir}/Example/ExData/RefLD
 anno_dir=${BFGWAS_dir}/Example/ExData/Anno
 
-# filehead=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/sim_20blocks_filehead.txt
-cat $filehead | while read line ; do
-echo $line
-#rsync /home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/RefLD/${line}.LDcorr.txt.gz*  /mnt/YangFSS/data2/AMP-AD/ROSMAP/WGS_JointCall/RefLD/
-rsync /home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/RefLD/${line}.LDcorr.txt.gz* /home/jyang/GIT/BFGWAS_QUANT/Example/ExData/RefLD/
-done
-
 ############# Test Simulation Data with  20 blocks
 # filehead=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/sim_20blocks_filehead.txt
 # Zscore_dir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/Sim_Zscore

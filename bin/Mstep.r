@@ -11,7 +11,7 @@ if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
 }
 # Packages loading
-invisible(lapply(packages, library, character.only = TRUE))
+invisible(lapply(packages, library, character.only = TRUE, warn.conflicts = FALSE, quietly = TRUE))
 
 #################################
 ptm <- proc.time()

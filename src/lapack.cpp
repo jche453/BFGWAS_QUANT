@@ -812,20 +812,16 @@ int LapackSolve(const gsl_matrix *XtX, const gsl_vector *b, gsl_vector *x){
     
     gsl_matrix *A = gsl_matrix_alloc(XtX->size1, XtX->size2);
     gsl_matrix_memcpy(A, XtX);
-    
     int N=A->size1, NRHS=1, LDA=A->size1, LDB=b->size, INFO;
     int ipiv[N];
-    
     if (N!=(int)A->size2 || N!=LDB) {cout<<"Matrix needs to be symmetric and same dimension in LapackSolve."<<endl; exit(-1);}
-    
     gsl_vector_memcpy (x, b);
     dgesv_( &N, &NRHS, A->data, &LDA, ipiv, x->data, &LDB, &INFO);
     
     if (INFO!=0) {
      //   PrintVector(x);
-        cout<<"INFO ="<< INFO << ": Lapack solve unsuccessful in LapackSolve."<<endl;
+      //  cout<<"INFO ="<< INFO << ": Lapack solve unsuccessful in LapackSolve."<<endl;
     }
-    
     gsl_matrix_free(A);
     return INFO;
 }
