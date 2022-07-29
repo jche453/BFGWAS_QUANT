@@ -2413,7 +2413,7 @@ bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<strin
             {
                 pch = nch+1;
                 nch = strchr(pch, '\t');
-                if( pch[0] != 'N' )
+                if( pch[0] != 'N' ) // reconize Zscore = NA
                		{
                         z_i = strtod(pch, NULL);
                         beta_i = z_i / sqrt((double)ni_test) ;
@@ -2434,12 +2434,10 @@ bool ReadFile_score(const string &file_score, vector<SNPPOS> &snp_pos, map<strin
                 { rs = key; }
             // cout<<key<<endl;
 
-            // Set xtx_vec values
             if(mapLDKey2Pos.count(key) == 0){
                 SwapKey(key);
                 if(mapLDKey2Pos.count(key) == 0){
                     ns_total++;
-                    //cout << "jump in third part \n"<<endl;
                     continue;
                 }
             }

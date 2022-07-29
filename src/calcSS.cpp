@@ -353,7 +353,8 @@ void CalcBeta(const gsl_matrix *D_cond, const gsl_vector * mbeta_cond, gsl_vecto
     size_t s_size = mbeta_cond->size;
     gsl_matrix *Dinv = gsl_matrix_alloc(s_size, s_size);
     gsl_matrix_memcpy(Dinv, D_cond);
-    LapackSolve(Dinv, mbeta_cond, beta_cond);
+    if(LapackSolve(Dinv, mbeta_cond, beta_cond)!=0)
+       EigenSolve(Dinv, mbeta_cond, beta_cond);
     gsl_matrix_free(Dinv);
     return ;
 }

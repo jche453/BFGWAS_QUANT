@@ -1032,7 +1032,7 @@ void BVSRM::setHyp(double tau_beta_temp)
         log_qtheta.push_back(log(1.0 - theta[i]));
         sum_logqtheta += log_qtheta[i] ;
     }
-   // cout << "sum of log( 1 - CPP ) of all SNPs : " << sum_logqtheta << endl;
+    cout << "sum of log( 1 - CPP ) of all SNPs : " << sum_logqtheta << endl;
 }
 
 
@@ -1307,10 +1307,11 @@ double BVSRM::CalcLikegamma(const vector<size_t> &rank)
 {
     double loglikegamma = sum_logqtheta;
     size_t pos_i;
-    if(rank.size() > 0){
+    if(rank.size() > 0)
+    {
         for (size_t i=0; i < rank.size(); i++) {
-            pos_i = mapRank2pos[i] ;
-            loglikegamma +=  loglikegamma + (log_theta[pos_i] - log_qtheta[pos_i]);
+            pos_i = mapRank2pos[rank[i]] ;
+            loglikegamma =  loglikegamma + (log_theta[pos_i] - log_qtheta[pos_i]);
         }
     }
     return loglikegamma;
@@ -2566,7 +2567,7 @@ void BVSRM::SetSSgamma(const vector< vector<double> > &LD, const vector<double> 
         pos_i = mapRank2pos[rank[0]];
         //cout << " and position : " << pos_i << endl;
         gsl_vector_set(mbeta_gamma, 0, mbeta[pos_i]);
-        gsl_matrix_set(D_gamma, 0, 0, 1);
+        gsl_matrix_set(D_gamma, 0, 0, 1.0);
     }
     return;
 }
@@ -2575,7 +2576,8 @@ void BVSRM::SetSSgammaAdd (const vector< vector<double> > &LD, const vector<doub
 {
     double xtx_i;
     size_t s_size = rank_old.size();
-    size_t pos = mapRank2pos[ranki], pos_i; // position of the newly proposed SNP rank
+    size_t pos = mapRank2pos[ranki];
+    size_t pos_i; // position of the newly proposed SNP rank
 
     if (s_size==0) {
         cerr << "SetSSgammaAdd rank_old has size 0\n";
@@ -2802,9 +2804,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
     //cout << "ni_effect_vec size = " << ni_effect_vec.size() << endl;
     //cout << snp_pos[0].key <<"; " << snp_pos[2].key <<"; " << snp_pos[3].key <<"; " << endl;
     //cout << snp_pos[0].maf <<"; " << snp_pos[2].maf <<"; " << snp_pos[3].maf <<"; " << endl;
-    //PrintVector(xtx_vec, 3);
-    //PrintVector(snp_var_vec, 3);
-    //PrintVector(ni_effect_vec, 3);
 
     // standardized phenotype with variance 1
     rv = 1.0;
@@ -2934,7 +2933,6 @@ void BVSRM::MCMC_SS (const vector< vector<double> > &LD, const vector<double> &m
             logMHratio = ProposeGamma_SS (rank_old, rank_new, cHyp_old, cHyp_new, repeat, LD, mbeta, D_old, mbeta_old, D_new, mbeta_new); //JY
            // cout << "After ProposeGamma_SS : propose gamma logMHratio = "<<logMHratio << "; MHratio = " << exp(logMHratio) << endl ;
             time_Proposal += (clock()-time_start)/(double(CLOCKS_PER_SEC)*60.0);
-
             //cout << "propose new rank: "; PrintVector(rank_new);
             //cout << "flag_gamma = " << flag_gamma << endl;
             //cout << "propose gamma success... with rank_new.size = " << rank_new.size() << endl;
@@ -3216,19 +3214,19 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
     gsl_vector_view Omega_diag = gsl_matrix_diagonal(Omega);
     gsl_vector_add_constant(&Omega_diag.vector, tau_beta);
 
+    // calculate logdet(Omega)
+    double logdet_O = 0.0;
+    logdet_O = LapackLogDet(Omega);
+   // cout << "logdet_O = " << logdet_O << endl;
+
     // posterior estimates of beta_hat
     if(LapackSolve(Omega, &mbeta_sub.vector, beta_hat)!=0)
        EigenSolve(Omega, &mbeta_sub.vector, beta_hat);
     //cout << "beta_hat: "; PrintVector(beta_hat);
     gsl_vector_view beta_sub=gsl_vector_subvector(beta, 0, s_size);
     gsl_vector_memcpy(&beta_sub.vector, beta_hat);
-    double mbeta_t_betahat ;
-    gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &mbeta_t_betahat);
-
-    // calculate logdet(Omega)
-    double logdet_O = 0.0;
-    logdet_O = LapackLogDet(Omega);
-   // cout << "logdet_O = " << logdet_O << endl;
+    double bSb;
+    gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &bSb);
 
     // Start here 06/04/2022
     gsl_vector *D_beta_hat = gsl_vector_alloc (s_size);
@@ -3245,10 +3243,7 @@ double BVSRM::CalcPosterior_SS (const gsl_matrix *D, const gsl_vector *mbeta, gs
     Error_Flag=0;
     cHyp.pve = R2; // Calculate pve
 
-    double bSb;
-    gsl_blas_ddot (&mbeta_sub.vector, beta_hat, &bSb);
-    loglike = 0.5 * (double)s_size * log(tau_beta) ;
-    loglike = loglike + 0.5 * ( (double)ni_test * mbeta_t_betahat - logdet_O ); // log posterior likelihood
+    loglike = 0.5 * ((double)s_size * log(tau_beta) +  (double)ni_test * bSb - logdet_O ); // log posterior likelihood
    // cout << "Posterior Loglike  = " << loglike << endl;
 
     gsl_matrix_free (Omega);

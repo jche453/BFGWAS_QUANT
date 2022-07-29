@@ -21,17 +21,17 @@ LDdir=${BFGWAS_dir}/Example/ExData/RefLD
 anno_dir=${BFGWAS_dir}/Example/ExData/Anno
 
 ############# Test Simulation Data with  20 blocks
-# filehead=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/sim_20blocks_filehead.txt
-# Zscore_dir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/Sim_Zscore
-# LDdir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/RefLD
-# anno_dir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/Anno
+filehead=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/sim_20blocks_filehead.txt
+Zscore_dir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/Sim_Zscore
+LDdir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/RefLD
+anno_dir=/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_Data/Anno
 
 ########### Generate make file with all jobs
 ${BFGWAS_dir}/bin/gen_mkf.pl \
 --wkdir ${wkdir} --tool_dir ${BFGWAS_dir} \
 --filehead ${filehead} --LDdir ${LDdir} --Zscore_dir ${Zscore_dir} \
 --anno_dir ${anno_dir} --AnnoNumber ${Anum} --hfile ${hfile} \
---maf 0.01 --Nsample ${Nsample} --a_gamma 1.001 --b_gamma 1 \
+--maf 0.01 --Nsample ${Nsample} --a_gamma 1.1 --b_gamma 1 \
 --Nburnin ${Nburnin} --Nmcmc ${Nmcmc} --NmcmcLast ${Nmcmc} \
 --em ${em} --mf ${mkfile}
 

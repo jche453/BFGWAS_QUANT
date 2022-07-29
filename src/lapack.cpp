@@ -632,18 +632,14 @@ double LapackLogDet(const gsl_matrix *Omega)
     double logdet_O=0.0;
     gsl_matrix *OmegaTemp = gsl_matrix_alloc(Omega->size1, Omega->size2);
     gsl_matrix_memcpy(OmegaTemp, Omega);
-    
     topdm(OmegaTemp); //cholesky decomposition, A is distroyed
-    lapack_cholesky_decomp(OmegaTemp);
-    
+    lapack_cholesky_decomp(OmegaTemp); // OmegaTemp = L * L'
     for (size_t i=0; i< OmegaTemp->size1; ++i) {
         logdet_O+=log(gsl_matrix_get (OmegaTemp, i, i));
     }
-    // logdet_O*=2.0;
-    
+    logdet_O*=2.0; //
     gsl_matrix_free(OmegaTemp);
     return logdet_O;
-
 }
 
 

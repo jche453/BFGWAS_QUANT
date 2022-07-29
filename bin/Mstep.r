@@ -109,12 +109,12 @@ CI_fish_tau_beta <- function(sum_gamma, sum_beta2, gwas_n, a, b){
   return(c(tau_beta_hat, se_tau_beta))
 }
 
-tau_beta_temp = CI_fish_tau_beta(sum_gamma, sum_beta2, gwas_n, a_gamma, b_gamma)
-print("Estimates for tau_beta, and tau_beta_SE: ")
-print(tau_beta_temp)
+# tau_beta_temp = Est_tau_beta(sum_gamma, sum_beta2, gwas_n, a_gamma, b_gamma)
+tau_beta_temp = 1
+print(c("Fix tau_beta: ", tau_beta_temp))
 
 #####################################################
-hypmat <- data.table(`#hyper_parameter` = c("a", "tau_beta"), value = c(paste(a_temp, collapse = ",") , tau_beta_temp[1]))
+hypmat <- data.table(`#hyper_parameter` = c("a", "tau_beta"), value = c(paste(a_temp, collapse = ",") , tau_beta_temp))
 
 ########## Write out updated hyper parameter values
 print("hyper parameter values updates after MCMC: ")
@@ -134,12 +134,12 @@ print(paste("Posterior log likelihood = ",  loglike))
 # EM_result_file="/home/jyang/ResearchProjects/BFGWAS_QUANT_Test/Test_wkdir/EM_result.txt"
 if(k==0){
   write.table(data.frame(EM_iteration = k, R2 = R2, Loglike = loglike,
-                        tau_beta = tau_beta_temp[1], avec = paste(a_temp, collapse = ",")),
+                        tau_beta = tau_beta_temp, avec = paste(a_temp, collapse = ",")),
               file = EM_result_file,
               sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE, append=FALSE)
 }else{
   write.table(data.frame(EM_iteration = k, R2 = R2, Loglike = loglike,
-                        tau_beta = tau_beta_temp[1], avec = paste(a_temp, collapse = ",")),
+                        tau_beta = tau_beta_temp, avec = paste(a_temp, collapse = ",")),
               file = EM_result_file,
               sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE, append=TRUE)
 }
