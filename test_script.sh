@@ -36,7 +36,7 @@ ${BFGWAS_dir}/bin/gen_mkf.pl \
 --em ${em} --mf ${mkfile}
 
 ########## Submit a job to run the Makefile
-j=5 # Number of cores to run jobs in parallel
+j=4 # Number of cores to run jobs in parallel
 # make -f ${mkfile} clean
 qsub -q b.q -j y -pe smp ${j} -wd ${wkdir} -N BFGWAS ${BFGWAS_dir}/bin/run_make.sh --wkdir ${wkdir} --mkfile ${mkfile} --njob ${j}
 

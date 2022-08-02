@@ -7,7 +7,7 @@ source("/home/jyang/GIT/BFGWAS_QUANT/bin/R_funcs.r")
 setwd("/home/jyang/GIT/BFGWAS_QUANT/Example/")
 
 ######## Compare results
-paramdata_bfgwas = LoadEMdata(filename="/home/jyang/GIT/BFGWAS_QUANT/Example/Test_wkdir/Eoutput/paramtemp1.txt", header = TRUE)
+paramdata_bfgwas = LoadEMdata(filename="/home/jyang/GIT/BFGWAS_QUANT/Example/Test_wkdir/Eoutput/paramtemp3.txt", header = TRUE)
 #head(paramdata_bfgwas)
 sum(paramdata_bfgwas$Pi)
 
@@ -31,7 +31,7 @@ ggplot(paramdata_bfgwas[paramdata_bfgwas$Beta>0, ], aes(x = mBeta, y = Beta, col
 ggsave("/home/jyang/GIT/BFGWAS_QUANT/Example/AnalyzeResults/beta.pdf")
 
 ######## Results of hyper parameter estimates #######
-test_hyp <- LoadEMhyp(filename = "/home/jyang/GIT/BFGWAS_QUANT/Example/Test_wkdir/Eoutput/EM_result.txt", header = TRUE)
+test_hyp <- fread("/home/jyang/GIT/BFGWAS_QUANT/Example/Test_wkdir/Eoutput/EM_result.txt", header = TRUE)
 print(test_hyp)
 
 ######## END ################
